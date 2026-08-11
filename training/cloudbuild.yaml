@@ -1,0 +1,7 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: [build, -f, training/Dockerfile.v2, -t, asia-southeast1-docker.pkg.dev/$PROJECT_ID/blissiree-ai/trainer:qwen3-4b-qlora-v2, .]
+images:
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/blissiree-ai/trainer:qwen3-4b-qlora-v2
+options:
+  machineType: E2_HIGHCPU_8

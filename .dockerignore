@@ -1,0 +1,7 @@
+.git
+.gitignore
+.work
+**/__pycache__
+**/*.pyc
+*.pdf
+.DS_Store

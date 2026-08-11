@@ -1,0 +1,66 @@
+import sys
+import unittest
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).parents[1]/"app"))
+from blissiree.schemas import MentalStateAnalysis
+from blissiree.safety import OutputSafetyValidator,TriageEngine
+from blissiree.recommendations import SupportHorizonClassifier,ImmediateSupportEngine
+from blissiree.knowledge import KnowledgeRepository
+
+class TriageTests(unittest.TestCase):
+    def setUp(self): self.engine=TriageEngine()
+    def level(self,text,stress=None): return self.engine.evaluate(text,MentalStateAnalysis(stress_score_estimate=stress)).level
+    def test_self_harm(self): self.assertEqual(self.level("I might hurt myself tonight"),"T1")
+    def test_others(self): self.assertEqual(self.level("I will hurt someone"),"T2")
+    def test_abuse(self): self.assertEqual(self.level("My partner hits me"),"T3")
+    def test_medical(self): self.assertEqual(self.level("I have chest pain"),"T4")
+    def test_severe(self): self.assertEqual(self.level("I can't cope anymore"),"T5")
+    def test_moderate(self): self.assertEqual(self.level("I feel overwhelmed"),"T6")
+    def test_stable(self): self.assertEqual(self.level("I had a pleasant morning"),"T7")
+    def test_stress(self): self.assertEqual(self.level("A difficult day",9),"T5")
+
+class OutputTests(unittest.TestCase):
+    def test_diagnosis_rejected(self): self.assertFalse(OutputSafetyValidator().validate("You have depression.",set())[0])
+    def test_support_passes(self): self.assertTrue(OutputSafetyValidator().validate("We can take one small step.",set())[0])
+    def test_invented_collection_rejected(self): self.assertFalse(OutputSafetyValidator().validate("Try the Magical Healing Collection.",set())[0])
+    def test_invented_program_rejected(self): self.assertFalse(OutputSafetyValidator().validate('We have a program called "Understanding Relationship Patterns".',set())[0])
+    def test_internal_contract_leak_rejected(self): self.assertFalse(OutputSafetyValidator().validate("{'response_contract': {'persona': 'emma', 'compiled_instructions': []}}",set())[0])
+
+class RecommendationTests(unittest.TestCase):
+    immediate=[
+      "I'm struggling to sleep tonight.","I have a presentation tomorrow and feel nervous.","My relationship ended yesterday and I'm struggling.",
+      "I'm stressed from work today.","What should I listen to tonight?","I'm feeling low right now.","I need to calm down now.",
+      "My thoughts are racing tonight.","I feel lonely today.","I am angry after work today.","I need motivation today.",
+      "Help me focus this afternoon.","I need confidence before an event.","I feel triggered right now.","I need to unwind tonight.",
+      "I can't switch my brain off tonight.","I am worrying about tomorrow.","I need energy today.","Help me be present now.",
+      "I feel sad tonight.","Work pressure is high today.","I need something to settle down.","I'm replaying everything tonight.",
+      "I feel scared about tomorrow.","I want a quick confidence boost now.","I cannot concentrate today.","I need calm this evening.",
+      "I feel overwhelmed at the moment.","I need support before my speech.","I feel isolated tonight."
+    ]
+    long_term=[
+      "I've experienced the same relationship patterns for years and want to work through them properly.",
+      "I want a structured program to build long-term emotional resilience.","Which Blissiree program should I start?",
+      "I've been struggling for six months and want to make deeper changes.","This pattern has continued for years.",
+      "I want a long-term journey.","The same pattern keeps happening.","I need structured support for recurring patterns.",
+      "I want to fundamentally change how I respond.","Which program is suitable for me?",
+      "This happens in every relationship and I want deeper change.","I have had this problem for months.",
+      "I want to work through these patterns properly.","I need a structured way to make deeper change.","My reactions are recurring and I want a program."
+    ]
+    unclear=["I feel bad.","Can you help?","Something is off.","I don't know what I need.","I want support."]
+    def setUp(self): self.classifier=SupportHorizonClassifier(); self.analysis=MentalStateAnalysis()
+    def test_50_realistic_horizons(self):
+        self.assertEqual(len(self.immediate+self.long_term+self.unclear),50)
+        for text in self.immediate: self.assertEqual(self.classifier.classify(text,self.analysis).horizon,"IMMEDIATE",text)
+        for text in self.long_term: self.assertIn(self.classifier.classify(text,self.analysis).horizon,{"LONG_TERM","BOTH"},text)
+        for text in self.unclear: self.assertEqual(self.classifier.classify(text,self.analysis).horizon,"UNCLEAR",text)
+    def test_sleep_routes_to_sleep_collection(self):
+        repo=KnowledgeRepository(Path(__file__).parents[1]/"knowledge")
+        triage=TriageEngine().evaluate("I'm struggling to sleep tonight.",self.analysis)
+        recs,_=ImmediateSupportEngine().recommend("I'm struggling to sleep tonight.",self.analysis,triage,repo,self.classifier.classify("I'm struggling to sleep tonight.",self.analysis))
+        self.assertEqual(recs[0].title,"Sleep Support Collection")
+    def test_program_request_has_no_boost(self):
+        decision=self.classifier.classify("Which Blissiree program should I start?",self.analysis)
+        self.assertTrue(decision.program_assessment_required)
+        self.assertEqual(decision.program_relevance,"HIGH")
+
+if __name__=="__main__": unittest.main()

@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0",
+  "total": 660,
+  "splits": {
+    "train": 535,
+    "validation": 66,
+    "test": 59
+  },
+  "policy": "Behavior and approved program structure may be fine-tuned. Mutable catalog facts remain retrieval-authoritative. Unapproved content examples train refusal, never benefits."
+}

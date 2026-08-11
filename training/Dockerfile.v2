@@ -1,0 +1,2 @@
+FROM asia-southeast1-docker.pkg.dev/project-cb312c2a-9821-411b-a76/blissiree-ai/trainer:qwen3-4b-qlora-v1
+COPY training/train.py /app/train.py

@@ -1,11 +1,12 @@
 import sys
 import unittest
+import os
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).parents[1]/"app"))
 from blissiree.schemas import MentalStateAnalysis
 from blissiree.safety import OutputSafetyValidator,TriageEngine,terminal_turn_kind,terminal_turn_response
 from blissiree.recommendations import SupportHorizonClassifier,ImmediateSupportEngine
-from blissiree.knowledge import KnowledgeRepository
+from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
 
 class TriageTests(unittest.TestCase):
     def setUp(self): self.engine=TriageEngine()
@@ -77,5 +78,11 @@ class ConversationEndingTests(unittest.TestCase):
         self.assertNotIn("Collection",terminal_turn_response("emma","thanks"))
     def test_safety_language_overrides_goodbye(self):
         self.assertIsNone(terminal_turn_kind("goodbye, I am going to kill myself",self.triage))
+
+class TrainingKnowledgeTests(unittest.TestCase):
+    def test_active_case_study_is_retrievable(self):
+        items=[{"id":"youtube-test","title":"Feeling calmer after stress","instruction":"A participant described stress and finding calm through a gentle pause.","status":"ACTIVE","kind":"KNOWLEDGE","source":"YOUTUBE_PUBLIC","authority":70}]
+        rows=rank_training_knowledge(items,"I feel stress and want calm")
+        self.assertEqual(rows[0]["id"],"youtube-test")
 
 if __name__=="__main__": unittest.main()

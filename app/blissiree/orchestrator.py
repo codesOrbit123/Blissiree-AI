@@ -49,7 +49,9 @@ class BlissireeOrchestrator:
         analysis_ms=round((time.perf_counter()-t)*1000)
         triage=self.triage.evaluate(safety_context,analysis)
         horizon=self.horizon.classify(safety_context,analysis)
-        t=time.perf_counter(); docs=self.repo.retrieve(message) if self.config.rag_enabled else []; retrieval_ms=round((time.perf_counter()-t)*1000)
+        t=time.perf_counter(); docs=self.repo.retrieve(message) if self.config.rag_enabled else []
+        if self.config.rag_enabled and self.training_store:docs.extend(self.training_store.retrieve_knowledge(message))
+        retrieval_ms=round((time.perf_counter()-t)*1000)
         immediate,clarification=self.immediate.recommend(safety_context,analysis,triage,self.repo,horizon,bool(recent_user))
         program_assessment=self.long_term.assess(horizon,triage); long_term=[]
         contract=ResponseContract(persona=persona,user_state=UserState(triage=triage.level,stress=analysis.stress_score_estimate,

@@ -5,6 +5,7 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from google.cloud import storage
+from .knowledge import rank_training_knowledge
 
 BUCKET=os.getenv("TRAINING_STORE_BUCKET","")
 OBJECT="training-studio/library.json"
@@ -97,3 +98,5 @@ class TrainingStore:
         for v in restored["versions"][:-1]:v["status"]="SUPERSEDED"
         self._data=restored;self.save();return restored["versions"][-1]
     def effective(self,target): return [x for x in self.list(target=target) if x["status"]=="ACTIVE" and x["kind"]=="INSTRUCTION"]
+    def retrieve_knowledge(self,query,limit=3):
+        return rank_training_knowledge(self.load().get("items",[]),query,limit)

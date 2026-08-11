@@ -2,6 +2,18 @@ import json
 import re
 from pathlib import Path
 
+def rank_training_knowledge(rows,query,limit=3):
+    terms=set(re.findall(r"[a-z]{4,}",query.lower()))
+    if not terms:return []
+    scored=[]
+    for row in rows:
+        if row.get("status")!="ACTIVE" or row.get("kind")!="KNOWLEDGE":continue
+        text=(row.get("title","")+" "+row.get("instruction","")).lower()
+        score=len(terms & set(re.findall(r"[a-z]{4,}",text)))
+        if score:scored.append((score,row))
+    scored.sort(key=lambda pair:(pair[0],pair[1].get("authority",0)),reverse=True)
+    return [{"id":row["id"],"source":row.get("source","TRAINING_STUDIO"),"authority":row.get("authority",70),"text":row.get("instruction","")[:8000]} for _,row in scored[:limit]]
+
 class KnowledgeRepository:
     def __init__(self, root: Path):
         self.documents = []

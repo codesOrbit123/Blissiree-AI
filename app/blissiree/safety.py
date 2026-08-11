@@ -12,6 +12,9 @@ PATTERNS = {
     "T6": re.compile(r"\b(overwhelmed|anxious|very stressed|grief|lonely|ruminating|poor sleep|painful memor|not feeling well|deeply upset)\w*\b", re.I),
 }
 
+FAREWELL_PATTERN = re.compile(r"\b(good\s*bye|bye(?:\s+for\s+now)?|see\s+you|talk\s+(?:to\s+you\s+)?later|that(?:'s| is)\s+all|no\s+thanks?|nothing\s+else|issue\s+(?:is\s+)?solved|problem\s+(?:is\s+)?solved)\b", re.I)
+THANKS_PATTERN = re.compile(r"^\s*(?:thanks?(?:\s+(?:a\s+lot|alot|very\s+much))?|thank\s+you)(?:[\s,!.'’]*(?:emma|ben|you\s+are\s+(?:the\s+)?best)\b[\s,!.'’]*)*$", re.I)
+
 @dataclass(frozen=True)
 class TriageResult:
     level: str
@@ -27,6 +30,24 @@ class TriageEngine:
         if analysis.stress_score_estimate is not None and priority == "T7":
             priority = "T5" if analysis.stress_score_estimate >= 9 else "T6" if analysis.stress_score_estimate >= 6 else "T7"
         return TriageResult(priority, sorted(set(matches)), priority in {"T0","T1","T2","T3","T4","T5"})
+
+def terminal_turn_kind(message: str, triage: TriageEngine, analysis: MentalStateAnalysis | None = None) -> str | None:
+    """Return a terminal conversational intent without masking same-turn safety signals."""
+    current_triage=triage.evaluate(message,analysis or MentalStateAnalysis())
+    if current_triage.level in {"T0","T1","T2","T3","T4","T5"}:
+        return None
+    if FAREWELL_PATTERN.search(message):
+        return "farewell"
+    if len(message) <= 100 and THANKS_PATTERN.fullmatch(message):
+        return "thanks"
+    return None
+
+def terminal_turn_response(persona: str, kind: str) -> str:
+    if kind == "thanks":
+        return "You’re very welcome. I’m glad I could support you." if persona == "emma" else "You’re welcome. I’m glad that helped."
+    return ("I’m glad I could be here with you. Take gentle care of yourself, and you’re welcome back anytime. Goodbye for now."
+            if persona == "emma" else
+            "I’m glad we could work through it. Take care, and come back anytime you want support. Goodbye for now.")
 
 class OutputSafetyValidator:
     prohibited = [

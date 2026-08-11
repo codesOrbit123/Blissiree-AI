@@ -6,7 +6,7 @@ from .config import AIConfig
 from .knowledge import KnowledgeRepository
 from .providers import AnalysisLLMProvider, ConversationLLMProvider
 from .recommendations import ImmediateSupportEngine, LongTermJourneyEngine, SupportHorizonClassifier
-from .safety import OutputSafetyValidator, TriageEngine, deterministic_crisis_response
+from .safety import OutputSafetyValidator, TriageEngine, deterministic_crisis_response, terminal_turn_kind, terminal_turn_response
 from .schemas import MentalStateAnalysis, ResponseContract, UserState
 
 log = logging.getLogger("blissiree.ai")
@@ -28,6 +28,17 @@ class BlissireeOrchestrator:
 
     def respond(self, message: str, persona: str, history: list[dict], conversation_id: str | None = None) -> dict:
         request_id=str(uuid.uuid4()); started=time.perf_counter(); errors=[]
+        terminal_kind=terminal_turn_kind(message,self.triage)
+        if terminal_kind:
+            text=terminal_turn_response(persona,terminal_kind)
+            event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
+                "conversation_model":self.config.conversation_model,"triage_level":"T7","retrieved_content_ids":[],"recommended_boost_ids":[],
+                "recommended_program_id":None,"support_horizon":"UNCLEAR","boost_relevance_score":"VERY_LOW","program_relevance_score":"VERY_LOW",
+                "latency_analysis_ms":0,"latency_retrieval_ms":0,"latency_generation_ms":0,
+                "latency_total_ms":round((time.perf_counter()-started)*1000),"token_usage":{},"model_errors":[],
+                "output_validation_result":"pass:terminal_"+terminal_kind}
+            log.info(json.dumps(event,separators=(",",":")))
+            return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":[]}
         recent_user=[str(x.get("content","")) for x in history[-8:] if x.get("role")=="user"]
         safety_context="\n".join(recent_user[-3:]+[message])
         t=time.perf_counter()

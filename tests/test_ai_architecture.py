@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).parents[1]/"app"))
 from blissiree.schemas import MentalStateAnalysis
-from blissiree.safety import OutputSafetyValidator,TriageEngine
+from blissiree.safety import OutputSafetyValidator,TriageEngine,terminal_turn_kind,terminal_turn_response
 from blissiree.recommendations import SupportHorizonClassifier,ImmediateSupportEngine
 from blissiree.knowledge import KnowledgeRepository
 
@@ -62,5 +62,20 @@ class RecommendationTests(unittest.TestCase):
         decision=self.classifier.classify("Which Blissiree program should I start?",self.analysis)
         self.assertTrue(decision.program_assessment_required)
         self.assertEqual(decision.program_relevance,"HIGH")
+
+class ConversationEndingTests(unittest.TestCase):
+    def setUp(self): self.triage=TriageEngine()
+    def test_goodbye_ends_without_followup(self):
+        self.assertEqual(terminal_turn_kind("no thanks good bye",self.triage),"farewell")
+        reply=terminal_turn_response("emma","farewell")
+        self.assertIn("Goodbye",reply)
+        self.assertNotIn("?",reply)
+    def test_resolved_issue_closes_gently(self):
+        self.assertEqual(terminal_turn_kind("my issue is solved",self.triage),"farewell")
+    def test_short_thanks_does_not_repeat_recommendation(self):
+        self.assertEqual(terminal_turn_kind("thanks alot emma you are best",self.triage),"thanks")
+        self.assertNotIn("Collection",terminal_turn_response("emma","thanks"))
+    def test_safety_language_overrides_goodbye(self):
+        self.assertIsNone(terminal_turn_kind("goodbye, I am going to kill myself",self.triage))
 
 if __name__=="__main__": unittest.main()

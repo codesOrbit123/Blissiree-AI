@@ -76,7 +76,7 @@ class BlissireeOrchestrator:
         t=time.perf_counter(); usage={}; validation="fallback"
         if triage.blocks_recommendations:
             text=deterministic_crisis_response(triage.level,message)
-        elif conversation_intent.mode == "REFUSAL":
+        elif conversation_intent.mode in {"REFUSAL","FEEDBACK"}:
             text=contextual_fallback(persona,message,conversation_intent,bool(recent_user)); validation="pass:refusal"
         else:
             try:

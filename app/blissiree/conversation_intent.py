@@ -25,7 +25,7 @@ SUPPORT_SIGNAL = re.compile(
     r"\b(i (?:am|feel|felt|was|'m)|feeling|stressed|stress|anxious|anxiety|worried|worry|"
     r"sad|low|lonely|angry|overwhelmed|upset|exhausted|tired|sleep|calm|confidence|"
     r"motivation|relationship|grief|thoughts?|emotion(?:al|ally)?|support|help me|cope|"
-    r"personal development|blissiree|boost|program|crying|cried|lost|loss|money|financial)\b",
+    r"personal development|blissiree|boost|program|crying|cried|lost|loss|money|dollars?|financial)\b",
     re.I,
 )
 EXPLICIT_RECOMMENDATION = re.compile(
@@ -104,8 +104,8 @@ def contextual_fallback(persona: str, message: str, intent: ConversationIntent, 
             if persona == "emma"
             else "I’m sorry—that response missed the mark. I’ll be more direct and measured. What would work better for you?"
         )
-    if re.search(r"\b(lost|loss)\b.{0,80}\b(\$|money|btc|bitcoin|crypto|savings?|financial)",message,re.I) or re.search(
-        r"\b(\$|money|btc|bitcoin|crypto|savings?|financial)\b.{0,80}\b(lost|loss)\b",message,re.I
+    if re.search(r"\b(lost|loss)\b.{0,80}\b(\$|money|dollars?|btc|bitcoin|crypto|savings?|financial)",message,re.I) or re.search(
+        r"\b(\$|money|dollars?|btc|bitcoin|crypto|savings?|financial)\b.{0,80}\b(lost|loss)\b",message,re.I
     ):
         return (
             "Losing that much sounds deeply upsetting and destabilising. What feels most urgent right now—the shock of it, worry about what happens next, or simply getting through this moment?"
@@ -132,9 +132,7 @@ def conversation_stage(message: str, history: list[dict]) -> str:
     prior_user_turns = sum(1 for item in history[-8:] if item.get("role") == "user")
     if prior_user_turns == 0:
         return "DISCOVERY"
-    if prior_user_turns < 2:
-        return "EXPLORATION"
-    return "RECOMMENDATION"
+    return "EXPLORATION"
 
 
 def stage_guidance(stage: str) -> str:

@@ -157,10 +157,10 @@ class ConversationRelevanceTests(unittest.TestCase):
         history=[{"role":"user","content":"I feel exhausted"},{"role":"assistant","content":"When did this begin?"}]
         self.assertEqual(conversation_stage("It started two months ago",history),"EXPLORATION")
 
-    def test_third_user_turn_can_reach_recommendation(self):
+    def test_third_user_turn_still_requires_explicit_recommendation_request(self):
         history=[{"role":"user","content":"I feel exhausted"},{"role":"assistant","content":"When?"},
                  {"role":"user","content":"Two months"},{"role":"assistant","content":"What affects it?"}]
-        self.assertEqual(conversation_stage("Work pressure makes it worse",history),"RECOMMENDATION")
+        self.assertEqual(conversation_stage("Work pressure makes it worse",history),"EXPLORATION")
 
     def test_direct_resource_request_can_reach_recommendation(self):
         self.assertEqual(conversation_stage("What should I listen to tonight?",[]),"RECOMMENDATION")

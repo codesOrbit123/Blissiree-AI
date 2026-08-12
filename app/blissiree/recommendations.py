@@ -42,7 +42,7 @@ COLLECTION_ROUTES = [
     ("collection-053",re.compile(r"\b(motivation|motivated|enthusiasm|procrastinat)\w*\b",re.I)),
     ("collection-004",re.compile(r"\b(focus|concentrat|mental clarity|clear my head)\w*\b",re.I)),
     ("collection-018",re.compile(r"\b(productiv|energy today|start my day)\w*\b",re.I)),
-    ("collection-045",re.compile(r"\b(stress|stressed|pressure|tension|overwhelmed|settle down|calm down)\b",re.I)),
+    ("collection-045",re.compile(r"\b(stress|stressed|pressure|tension|overwhelmed|settle down|calm down|mind (?:is |feels )?(?:going to |gonna )?(?:blow|explode)|too much)\b",re.I)),
     ("collection-030",re.compile(r"\b(inner peace|calm|settle|unwind|relax)\w*\b",re.I)),
     ("collection-013",re.compile(r"\b(present moment|be present|mindful|grounded)\b",re.I)),
 ]

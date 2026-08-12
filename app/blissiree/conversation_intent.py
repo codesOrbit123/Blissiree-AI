@@ -15,11 +15,17 @@ OFF_TOPIC = re.compile(
     re.I,
 )
 CASUAL = re.compile(r"^\s*(hi|hello|hey|what'?s up|how are you|who are you|what can you do)[\s?!.]*$", re.I)
+FEEDBACK = re.compile(
+    r"\b(you(?:'re| are) (?:too )?(?:rude|cold|robotic|repetitive|not listening)|"
+    r"that was rude|you don'?t understand|you are not helping|that wasn'?t helpful|"
+    r"stop repeating|your tone|don'?t call me that)\b",
+    re.I,
+)
 SUPPORT_SIGNAL = re.compile(
     r"\b(i (?:am|feel|felt|was|'m)|feeling|stressed|stress|anxious|anxiety|worried|worry|"
     r"sad|low|lonely|angry|overwhelmed|upset|exhausted|tired|sleep|calm|confidence|"
     r"motivation|relationship|grief|thoughts?|emotion(?:al|ally)?|support|help me|cope|"
-    r"personal development|blissiree|boost|program)\b",
+    r"personal development|blissiree|boost|program|crying|cried|lost|loss|money|financial)\b",
     re.I,
 )
 EXPLICIT_RECOMMENDATION = re.compile(
@@ -43,20 +49,27 @@ def classify_conversation_intent(message: str, analysis: MentalStateAnalysis) ->
             "REFUSAL",
             "Respect the user's request for space. Reply briefly, do not challenge the tone, and do not ask a question.",
         )
-    if OFF_TOPIC.search(message):
+    if FEEDBACK.search(message):
         return ConversationIntent(
-            "OUT_OF_SCOPE",
-            "Acknowledge the request briefly. Explain naturally that your role is Blissiree emotional support and personal development, then offer one optional way to connect the topic to how the user is feeling. Do not use the standard emotional clarification question.",
+            "FEEDBACK",
+            "Treat this as feedback about your response. Acknowledge it briefly and sincerely without over-apologising, "
+            "defending yourself, repeating emotional validation, or recommending content. Ask at most one short question "
+            "about how the user would prefer you to respond.",
         )
     if CASUAL.fullmatch(message):
         return ConversationIntent(
             "CASUAL",
             "Respond naturally to the greeting or capability question, briefly describe your Blissiree companion role, and invite the user to share what kind of emotional or personal-development support would help.",
         )
-    # Explicit wellbeing language is authoritative. A model's broad off-topic label
-    # must not redirect a genuine request such as "I am stressed about tomorrow."
+    # Emotional meaning takes precedence when an otherwise off-topic subject is
+    # affecting the user, such as distress after a financial loss.
     if SUPPORT_SIGNAL.search(message):
         return ConversationIntent("SUPPORT", None)
+    if OFF_TOPIC.search(message):
+        return ConversationIntent(
+            "OUT_OF_SCOPE",
+            "Acknowledge the request briefly. Explain naturally that your role is Blissiree emotional support and personal development, then offer one optional way to connect the topic to how the user is feeling. Do not use the standard emotional clarification question.",
+        )
     if analysis.intent.lower() in {"off_topic", "out_of_scope", "unrelated"}:
         return ConversationIntent(
             "OUT_OF_SCOPE",
@@ -84,6 +97,20 @@ def contextual_fallback(persona: str, message: str, intent: ConversationIntent, 
             "Hi, I’m Emma. I’m here for gentle emotional support and personal development. What would feel helpful today?"
             if persona == "emma"
             else "Hi, I’m Ben. I offer calm, practical support for emotional wellbeing and personal development. What would you like to work through?"
+        )
+    if intent.mode == "FEEDBACK":
+        return (
+            "I’m sorry—that didn’t feel supportive. I’ll keep my tone straightforward and gentle. How would you prefer me to respond?"
+            if persona == "emma"
+            else "I’m sorry—that response missed the mark. I’ll be more direct and measured. What would work better for you?"
+        )
+    if re.search(r"\b(lost|loss)\b.{0,80}\b(\$|money|btc|bitcoin|crypto|savings?|financial)",message,re.I) or re.search(
+        r"\b(\$|money|btc|bitcoin|crypto|savings?|financial)\b.{0,80}\b(lost|loss)\b",message,re.I
+    ):
+        return (
+            "Losing that much sounds deeply upsetting and destabilising. What feels most urgent right now—the shock of it, worry about what happens next, or simply getting through this moment?"
+            if persona == "emma"
+            else "That is a serious financial loss, and the immediate emotional impact can be intense. What needs attention first—the shock, your next practical step, or getting steadier right now?"
         )
     if has_context:
         return (

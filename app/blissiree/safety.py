@@ -9,7 +9,7 @@ PATTERNS = {
     "T3": re.compile(r"\b(domestic violence|abuse[ds]? me|partner (hits|threatens)|not safe at home|coercive control|controls? my (money|movement)|afraid of my partner)\b", re.I),
     "T4": re.compile(r"\b(chest pain|can't breathe|severe breathlessness|overdose|seizure|medical emergency|one[- ]sided weakness|facial droop(?:ing)?|slurred speech|sudden severe headache|vision loss|faint(?:ed|ing)|falling asleep (while )?driving|fell asleep (while )?driving)\b", re.I),
     "T5": re.compile(r"\b(can't cope|cannot cope|falling apart|severe distress|hopeless)\b", re.I),
-    "T6": re.compile(r"\b(overwhelmed|anxious|very stressed|grief|lonely|ruminating|poor sleep|painful memor|not feeling well|deeply upset)\w*\b", re.I),
+    "T6": re.compile(r"\b(overwhelmed|anxious|very stressed|grief|lonely|ruminating|poor sleep|painful memor|not feeling well|deeply upset|mind (?:is |feels )?(?:going to |gonna )?(?:blow|explode))\w*\b", re.I),
 }
 
 FAREWELL_PATTERN = re.compile(r"\b(good\s*bye|bye(?:\s+for\s+now)?|see\s+you|talk\s+(?:to\s+you\s+)?later|that(?:'s| is)\s+all|no\s+thanks?|nothing\s+else|issue\s+(?:is\s+)?solved|problem\s+(?:is\s+)?solved)\b", re.I)
@@ -55,6 +55,7 @@ class OutputSafetyValidator:
         re.compile(r"\b(take|stop taking|increase|decrease) (this |your )?(medication|medicine|dose)\b", re.I),
         re.compile(r"\b(guaranteed|will cure|clinically proven to treat)\b", re.I),
         re.compile(r"\b(you only need me|don't tell anyone|I am all you need)\b", re.I),
+        re.compile(r"\b(my dear|sweetheart|darling)\b", re.I),
     ]
     def validate(self, text: str, allowed_titles: set[str], known_titles: set[str] | None = None) -> tuple[bool, list[str]]:
         failures = [p.pattern for p in self.prohibited if p.search(text)]
@@ -66,7 +67,8 @@ class OutputSafetyValidator:
             if title in text and title not in allowed_titles:
                 failures.append("ineligible_recommendation")
                 break
-        named_resource=re.search(r"(?:the\s+)?(?:\*\*)?([A-Z][A-Za-z&'’ -]{2,80}\s(?:Boost|Audio|Program))(?:\*\*)?",text)
+        plain_text=re.sub(r"[*_`]", "", text)
+        named_resource=re.search(r"(?:the\s+)?([A-Z][A-Za-z&'’ -]{2,80}\s(?:Boost|Audio|Program))",plain_text)
         if named_resource and not any(title in text for title in allowed_titles):
             failures.append("unapproved_named_resource")
         invented_program = re.search(r"\bprogram called\s+[\"']?([^\"'.\n]+)", text, re.I)

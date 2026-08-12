@@ -7,7 +7,7 @@ from blissiree.schemas import MentalStateAnalysis
 from blissiree.safety import OutputSafetyValidator,TriageEngine,deterministic_crisis_response,terminal_turn_kind,terminal_turn_response
 from blissiree.recommendations import SupportHorizonClassifier,ImmediateSupportEngine
 from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
-from blissiree.conversation_intent import classify_conversation_intent,contextual_fallback,conversation_stage
+from blissiree.conversation_intent import ConversationIntent,classify_conversation_intent,contextual_fallback,conversation_stage
 
 class TriageTests(unittest.TestCase):
     def setUp(self): self.engine=TriageEngine()
@@ -31,6 +31,7 @@ class TriageTests(unittest.TestCase):
 class OutputTests(unittest.TestCase):
     def test_diagnosis_rejected(self): self.assertFalse(OutputSafetyValidator().validate("You have depression.",set())[0])
     def test_support_passes(self): self.assertTrue(OutputSafetyValidator().validate("We can take one small step.",set())[0])
+    def test_patronising_endearment_rejected(self): self.assertFalse(OutputSafetyValidator().validate("Oh, my dear, that is difficult.",set())[0])
     def test_invented_collection_rejected(self): self.assertFalse(OutputSafetyValidator().validate("Try the Magical Healing Collection.",set())[0])
     def test_invented_program_rejected(self): self.assertFalse(OutputSafetyValidator().validate('We have a program called "Understanding Relationship Patterns".',set())[0])
     def test_internal_contract_leak_rejected(self): self.assertFalse(OutputSafetyValidator().validate("{'response_contract': {'persona': 'emma', 'compiled_instructions': []}}",set())[0])
@@ -38,6 +39,10 @@ class OutputTests(unittest.TestCase):
         self.assertFalse(OutputSafetyValidator().validate("Try the Sleep Support Collection.",set(),{"Sleep Support Collection"})[0])
     def test_invented_named_boost_rejected(self):
         valid,failures=OutputSafetyValidator().validate("I recommend the **Calm Mind Boost**.",{"Anxious Thoughts Support Collection"})
+        self.assertFalse(valid)
+        self.assertIn("unapproved_named_resource",failures)
+    def test_markdown_split_invented_boost_rejected(self):
+        valid,failures=OutputSafetyValidator().validate("Try the **Calm** Boost.",{"Stress and Tension Management Collection"})
         self.assertFalse(valid)
         self.assertIn("unapproved_named_resource",failures)
 
@@ -134,6 +139,16 @@ class ConversationRelevanceTests(unittest.TestCase):
     def test_emotional_language_overrides_model_off_topic_false_positive(self):
         analysis=MentalStateAnalysis(intent="off_topic")
         self.assertEqual(classify_conversation_intent("I am stressed about tomorrow",analysis).mode,"SUPPORT")
+
+    def test_financial_loss_is_emotional_support_not_btc_lookup(self):
+        self.assertEqual(classify_conversation_intent("I lost $9000 in BTC and I am crying",MentalStateAnalysis()).mode,"SUPPORT")
+        reply=contextual_fallback("emma","I lost $9000 in BTC and I am crying",ConversationIntent("SUPPORT",None),True)
+        self.assertIn("losing that much",reply.lower())
+
+    def test_tone_criticism_is_feedback_not_new_support_topic(self):
+        intent=classify_conversation_intent("You are too rude",MentalStateAnalysis())
+        self.assertEqual(intent.mode,"FEEDBACK")
+        self.assertIn("missed the mark",contextual_fallback("ben","You are too rude",intent,True))
 
     def test_opening_disclosure_stays_in_discovery(self):
         self.assertEqual(conversation_stage("I feel emotionally exhausted",[]),"DISCOVERY")

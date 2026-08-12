@@ -15,6 +15,9 @@ class TriageTests(unittest.TestCase):
     def test_others(self): self.assertEqual(self.level("I will hurt someone"),"T2")
     def test_abuse(self): self.assertEqual(self.level("My partner hits me"),"T3")
     def test_medical(self): self.assertEqual(self.level("I have chest pain"),"T4")
+    def test_unexplained_weakness_red_flag(self): self.assertEqual(self.level("I have sudden one-sided weakness and slurred speech"),"T4")
+    def test_drowsy_driving_red_flag(self): self.assertEqual(self.level("I am falling asleep while driving"),"T4")
+    def test_coercive_control(self): self.assertEqual(self.level("My partner controls my money and movement"),"T3")
     def test_severe(self): self.assertEqual(self.level("I can't cope anymore"),"T5")
     def test_moderate(self): self.assertEqual(self.level("I feel overwhelmed"),"T6")
     def test_stable(self): self.assertEqual(self.level("I had a pleasant morning"),"T7")
@@ -59,6 +62,13 @@ class RecommendationTests(unittest.TestCase):
         triage=TriageEngine().evaluate("I'm struggling to sleep tonight.",self.analysis)
         recs,_=ImmediateSupportEngine().recommend("I'm struggling to sleep tonight.",self.analysis,triage,repo,self.classifier.classify("I'm struggling to sleep tonight.",self.analysis))
         self.assertEqual(recs[0].title,"Sleep Support Collection")
+    def test_physical_exhaustion_routes_to_approved_collection(self):
+        message="I feel physically exhausted today"
+        decision=self.classifier.classify(message,self.analysis)
+        triage=TriageEngine().evaluate(message,self.analysis)
+        repo=KnowledgeRepository(Path(__file__).parents[1]/"knowledge")
+        recs,_=ImmediateSupportEngine().recommend(message,self.analysis,triage,repo,decision)
+        self.assertEqual(recs[0].title,"Fatigue to Energy Support Collection")
     def test_program_request_has_no_boost(self):
         decision=self.classifier.classify("Which Blissiree program should I start?",self.analysis)
         self.assertTrue(decision.program_assessment_required)
@@ -88,5 +98,10 @@ class TrainingKnowledgeTests(unittest.TestCase):
     def test_inactive_case_study_is_not_retrievable(self):
         items=[{"id":"youtube-test","title":"Stress story","instruction":"A participant described stress.","status":"DISABLED","kind":"KNOWLEDGE","source":"YOUTUBE_PUBLIC","authority":70}]
         self.assertEqual(rank_training_knowledge(items,"stress"),[])
+
+    def test_persona_specific_knowledge_does_not_cross_personas(self):
+        items=[{"id":"emma-only","title":"Exhaustion","instruction":"Emotionally exhausted and depleted.","target":"EMMA","status":"ACTIVE","kind":"KNOWLEDGE"}]
+        self.assertEqual(rank_training_knowledge(items,"emotionally exhausted",target="BEN"),[])
+        self.assertEqual(rank_training_knowledge(items,"emotionally exhausted",target="EMMA")[0]["id"],"emma-only")
 
 if __name__=="__main__": unittest.main()

@@ -28,6 +28,7 @@ class SupportHorizonClassifier:
 # Deterministic semantic routes to the supplied current collection names.
 COLLECTION_ROUTES = [
     ("collection-061",re.compile(r"\b(sleep|asleep|insomnia|switch (my )?brain off|lying awake)\b",re.I)),
+    ("collection-032",re.compile(r"\b(physically exhausted|physical exhaustion|no physical energy|fatigue|fatigued|wiped out)\b",re.I)),
     ("collection-055",re.compile(r"\b(public speaking|speech|presentation)\b.*\b(man|male|him)\b",re.I)),
     ("collection-056",re.compile(r"\b(public speaking|speech|presentation)\b.*\b(woman|female|her)\b",re.I)),
     ("collection-020",re.compile(r"\b(fear|afraid|scared|nervous|presentation|speech)\b",re.I)),

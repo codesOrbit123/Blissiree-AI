@@ -2,12 +2,13 @@ import json
 import re
 from pathlib import Path
 
-def rank_training_knowledge(rows,query,limit=3):
+def rank_training_knowledge(rows,query,limit=3,target=None):
     terms=set(re.findall(r"[a-z]{4,}",query.lower()))
     if not terms:return []
     scored=[]
     for row in rows:
         if row.get("status")!="ACTIVE" or row.get("kind")!="KNOWLEDGE":continue
+        if target and row.get("target","ALL") not in {"ALL",target}:continue
         text=(row.get("title","")+" "+row.get("instruction","")).lower()
         score=len(terms & set(re.findall(r"[a-z]{4,}",text)))
         if score:scored.append((score,row))

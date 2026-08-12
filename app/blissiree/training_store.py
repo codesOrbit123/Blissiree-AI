@@ -73,7 +73,8 @@ class TrainingStore:
                     if k in payload:existing[k]=payload[k]
                 existing["version"]+=1;existing["updated_at"]=now;row=existing
             else:
-                row=item(payload["title"],payload["instruction"],payload.get("target","ALL"),payload.get("category","OTHER"),payload.get("priority","NORMAL"),payload.get("source","TERRI"),95 if payload.get("source")=="TERRI" else 85,False,payload.get("affected_components",[]),payload.get("kind","INSTRUCTION"));row["created_by"]=actor;row["approved_by"]=actor if row["status"]=="ACTIVE" else None;data["items"].append(row)
+                source=payload.get("source","TERRI")
+                row=item(payload["title"],payload["instruction"],payload.get("target","ALL"),payload.get("category","OTHER"),payload.get("priority","NORMAL"),source,95 if source in {"TERRI","TERRI_WORKBOOK"} else 85,False,payload.get("affected_components",[]),payload.get("kind","INSTRUCTION"));row["created_by"]=actor;row["approved_by"]=actor if row["status"]=="ACTIVE" else None;data["items"].append(row)
             self.save();return row
     def transition(self,item_id,status,actor,reason):
         row=self.get(item_id)
@@ -98,5 +99,5 @@ class TrainingStore:
         for v in restored["versions"][:-1]:v["status"]="SUPERSEDED"
         self._data=restored;self.save();return restored["versions"][-1]
     def effective(self,target): return [x for x in self.list(target=target) if x["status"]=="ACTIVE" and x["kind"]=="INSTRUCTION"]
-    def retrieve_knowledge(self,query,limit=3):
-        return rank_training_knowledge(self.load().get("items",[]),query,limit)
+    def retrieve_knowledge(self,query,limit=3,target=None):
+        return rank_training_knowledge(self.load().get("items",[]),query,limit,target)

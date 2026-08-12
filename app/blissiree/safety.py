@@ -6,8 +6,8 @@ PATTERNS = {
     "T0": re.compile(r"\b(right now|immediate danger|actively|already (did|taken)|can't stay safe)\b", re.I),
     "T1": re.compile(r"\b(kill myself|suicide|end my life|hurt myself|self[- ]harm)\b", re.I),
     "T2": re.compile(r"\b(kill|hurt|attack|harm) (him|her|them|someone|people)\b", re.I),
-    "T3": re.compile(r"\b(domestic violence|abuse[ds]? me|partner (hits|threatens)|not safe at home)\b", re.I),
-    "T4": re.compile(r"\b(chest pain|can't breathe|overdose|seizure|medical emergency)\b", re.I),
+    "T3": re.compile(r"\b(domestic violence|abuse[ds]? me|partner (hits|threatens)|not safe at home|coercive control|controls? my (money|movement)|afraid of my partner)\b", re.I),
+    "T4": re.compile(r"\b(chest pain|can't breathe|severe breathlessness|overdose|seizure|medical emergency|one[- ]sided weakness|facial droop(?:ing)?|slurred speech|sudden severe headache|vision loss|faint(?:ed|ing)|falling asleep (while )?driving|fell asleep (while )?driving)\b", re.I),
     "T5": re.compile(r"\b(can't cope|cannot cope|falling apart|severe distress|hopeless)\b", re.I),
     "T6": re.compile(r"\b(overwhelmed|anxious|very stressed|grief|lonely|ruminating|poor sleep|painful memor|not feeling well|deeply upset)\w*\b", re.I),
 }

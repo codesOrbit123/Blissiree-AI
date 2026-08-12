@@ -1,0 +1,9 @@
+.gcloudignore
+.git/
+.work/
+node_modules/
+output/
+tmp/
+**/__pycache__/
+**/*.pyc
+.DS_Store

@@ -73,6 +73,12 @@ class RecommendationTests(unittest.TestCase):
         triage=TriageEngine().evaluate("I'm struggling to sleep tonight.",self.analysis)
         recs,_=ImmediateSupportEngine().recommend("I'm struggling to sleep tonight.",self.analysis,triage,repo,self.classifier.classify("I'm struggling to sleep tonight.",self.analysis))
         self.assertEqual(recs[0].title,"Sleep Support Collection")
+    def test_switch_mind_off_routes_to_sleep_collection(self):
+        message="What should I listen to tonight? I cannot switch my mind off."
+        repo=KnowledgeRepository(Path(__file__).parents[1]/"knowledge")
+        triage=TriageEngine().evaluate(message,self.analysis)
+        recs,_=ImmediateSupportEngine().recommend(message,self.analysis,triage,repo,self.classifier.classify(message,self.analysis))
+        self.assertEqual(recs[0].title,"Sleep Support Collection")
     def test_physical_exhaustion_routes_to_approved_collection(self):
         message="I feel physically exhausted today"
         decision=self.classifier.classify(message,self.analysis)

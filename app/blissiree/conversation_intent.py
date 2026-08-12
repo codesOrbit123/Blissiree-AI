@@ -15,6 +15,13 @@ OFF_TOPIC = re.compile(
     re.I,
 )
 CASUAL = re.compile(r"^\s*(hi|hello|hey|what'?s up|how are you|who are you|what can you do)[\s?!.]*$", re.I)
+SUPPORT_SIGNAL = re.compile(
+    r"\b(i (?:am|feel|felt|was|'m)|feeling|stressed|stress|anxious|anxiety|worried|worry|"
+    r"sad|low|lonely|angry|overwhelmed|upset|exhausted|tired|sleep|calm|confidence|"
+    r"motivation|relationship|grief|thoughts?|emotion(?:al|ally)?|support|help me|cope|"
+    r"personal development|blissiree|boost|program)\b",
+    re.I,
+)
 
 
 @dataclass(frozen=True)
@@ -40,6 +47,10 @@ def classify_conversation_intent(message: str, analysis: MentalStateAnalysis) ->
             "CASUAL",
             "Respond naturally to the greeting or capability question, briefly describe your Blissiree companion role, and invite the user to share what kind of emotional or personal-development support would help.",
         )
+    # Explicit wellbeing language is authoritative. A model's broad off-topic label
+    # must not redirect a genuine request such as "I am stressed about tomorrow."
+    if SUPPORT_SIGNAL.search(message):
+        return ConversationIntent("SUPPORT", None)
     if analysis.intent.lower() in {"off_topic", "out_of_scope", "unrelated"}:
         return ConversationIntent(
             "OUT_OF_SCOPE",

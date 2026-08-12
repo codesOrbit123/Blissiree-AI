@@ -119,6 +119,10 @@ class ConversationRelevanceTests(unittest.TestCase):
         reply=contextual_fallback("emma","Something happened",intent,False)
         self.assertNotIn("thoughts won",reply.lower())
 
+    def test_emotional_language_overrides_model_off_topic_false_positive(self):
+        analysis=MentalStateAnalysis(intent="off_topic")
+        self.assertEqual(classify_conversation_intent("I am stressed about tomorrow",analysis).mode,"SUPPORT")
+
 
 class TrainingKnowledgeTests(unittest.TestCase):
     def test_active_case_study_is_retrievable(self):

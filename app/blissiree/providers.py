@@ -27,7 +27,8 @@ class GeminiProvider(AnalysisLLMProvider, ConversationLLMProvider, EmbeddingProv
         prompt = """Extract only user-reported, non-diagnostic observations. Do not infer diagnoses.
 Classify support_horizon as IMMEDIATE, SHORT_TERM, LONG_TERM, BOTH, or UNCLEAR. Current/today/tonight needs favor Boost;
 only explicit program requests, persistent/repeated patterns, or desire for structured deeper change favor program intent.
-Classify intent as off_topic when the request is unrelated to emotional wellbeing, personal development, Blissiree content, or the current conversation.
+Classify intent as off_topic only when the request is unrelated to emotional wellbeing, personal development, Blissiree content, and the current conversation.
+Any stated feeling, stress, worry, relationship concern, support request, or request to calm down is general_support, never off_topic.
 Return separate boost and program relevance. JSON input:\n""" + str(payload)
         response = self.client.models.generate_content(
             model=self.config.analysis_model, contents=prompt,

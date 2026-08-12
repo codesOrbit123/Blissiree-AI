@@ -32,6 +32,23 @@ class KnowledgeRepository:
         for collection in self.catalog["boost_collections"]:
             self.documents.append({"id":collection["id"],"source":collection["source"],"authority":80,
                                    "text":f"Current Boost collection: {collection['display_name']}. Legacy name: {collection['legacy_name']}."})
+        workbook_training = root / "sources" / "terri_exhaustion_training.json"
+        if workbook_training.exists():
+            data=json.loads(workbook_training.read_text())
+            for record in data.get("records",[]):
+                exemplar=record.get("active_companion_training",{})
+                if not exemplar:continue
+                parts=[
+                    f"Terri companion exemplar {exemplar.get('record_id')}: {exemplar.get('topic','')}",
+                    "User language: "+" | ".join(exemplar.get("user_language",[])),
+                    "Emotional context: "+" | ".join(exemplar.get("reported_emotional_context",[])),
+                    "Personalisation signals: "+"; ".join(exemplar.get("personalization_signals",[])),
+                    "Safe opening examples: "+" | ".join(exemplar.get("safe_empathy_openings",[])),
+                    "Useful follow-up areas: "+" | ".join(exemplar.get("safe_follow_up_prompts",[])),
+                    "Must avoid: "+"; ".join(exemplar.get("must_avoid",[])),
+                    exemplar.get("recommendation_boundary",""),exemplar.get("medical_boundary","")]
+                self.documents.append({"id":f"terri-workbook:{record.get('id')}","source":"TERRI_WORKBOOK",
+                                       "authority":95,"text":"\n".join(x for x in parts if x)})
 
     def retrieve(self, query: str, limit: int = 10) -> list[dict]:
         terms = set(re.findall(r"[a-z]{4,}", query.lower()))

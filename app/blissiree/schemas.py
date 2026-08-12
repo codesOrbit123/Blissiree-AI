@@ -48,3 +48,4 @@ class ResponseContract(BaseModel):
     compiled_instructions: list[dict] = []
     interaction_mode: Literal["SUPPORT", "CASUAL", "OUT_OF_SCOPE", "REFUSAL"] = "SUPPORT"
     response_guidance: str | None = None
+    conversation_stage: Literal["DISCOVERY", "EXPLORATION", "RECOMMENDATION"] = "DISCOVERY"

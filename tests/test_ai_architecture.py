@@ -7,7 +7,7 @@ from blissiree.schemas import MentalStateAnalysis
 from blissiree.safety import OutputSafetyValidator,TriageEngine,deterministic_crisis_response,terminal_turn_kind,terminal_turn_response
 from blissiree.recommendations import SupportHorizonClassifier,ImmediateSupportEngine
 from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
-from blissiree.conversation_intent import classify_conversation_intent,contextual_fallback
+from blissiree.conversation_intent import classify_conversation_intent,contextual_fallback,conversation_stage
 
 class TriageTests(unittest.TestCase):
     def setUp(self): self.engine=TriageEngine()
@@ -34,6 +34,8 @@ class OutputTests(unittest.TestCase):
     def test_invented_collection_rejected(self): self.assertFalse(OutputSafetyValidator().validate("Try the Magical Healing Collection.",set())[0])
     def test_invented_program_rejected(self): self.assertFalse(OutputSafetyValidator().validate('We have a program called "Understanding Relationship Patterns".',set())[0])
     def test_internal_contract_leak_rejected(self): self.assertFalse(OutputSafetyValidator().validate("{'response_contract': {'persona': 'emma', 'compiled_instructions': []}}",set())[0])
+    def test_ineligible_known_title_rejected(self):
+        self.assertFalse(OutputSafetyValidator().validate("Try the Sleep Support Collection.",set(),{"Sleep Support Collection"})[0])
 
 class RecommendationTests(unittest.TestCase):
     immediate=[
@@ -122,6 +124,32 @@ class ConversationRelevanceTests(unittest.TestCase):
     def test_emotional_language_overrides_model_off_topic_false_positive(self):
         analysis=MentalStateAnalysis(intent="off_topic")
         self.assertEqual(classify_conversation_intent("I am stressed about tomorrow",analysis).mode,"SUPPORT")
+
+    def test_opening_disclosure_stays_in_discovery(self):
+        self.assertEqual(conversation_stage("I feel emotionally exhausted",[]),"DISCOVERY")
+
+    def test_second_disclosure_stays_in_exploration(self):
+        history=[{"role":"user","content":"I feel exhausted"},{"role":"assistant","content":"When did this begin?"}]
+        self.assertEqual(conversation_stage("It started two months ago",history),"EXPLORATION")
+
+    def test_third_user_turn_can_reach_recommendation(self):
+        history=[{"role":"user","content":"I feel exhausted"},{"role":"assistant","content":"When?"},
+                 {"role":"user","content":"Two months"},{"role":"assistant","content":"What affects it?"}]
+        self.assertEqual(conversation_stage("Work pressure makes it worse",history),"RECOMMENDATION")
+
+    def test_direct_resource_request_can_reach_recommendation(self):
+        self.assertEqual(conversation_stage("What should I listen to tonight?",[]),"RECOMMENDATION")
+
+class TerriWorkbookTrainingTests(unittest.TestCase):
+    def test_all_fifteen_companion_records_are_loaded(self):
+        repo=KnowledgeRepository(Path(__file__).parents[1]/"knowledge")
+        rows=[d for d in repo.documents if d["source"]=="TERRI_WORKBOOK"]
+        self.assertEqual(len(rows),15)
+
+    def test_emotional_exhaustion_retrieves_terri_companion_exemplar(self):
+        repo=KnowledgeRepository(Path(__file__).parents[1]/"knowledge")
+        rows=repo.retrieve("I feel emotionally exhausted and drained all the time")
+        self.assertTrue(any(d["id"]=="terri-workbook:EX-004A" for d in rows))
 
 
 class TrainingKnowledgeTests(unittest.TestCase):

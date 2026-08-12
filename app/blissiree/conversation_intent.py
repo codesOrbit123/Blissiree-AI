@@ -22,6 +22,12 @@ SUPPORT_SIGNAL = re.compile(
     r"personal development|blissiree|boost|program)\b",
     re.I,
 )
+EXPLICIT_RECOMMENDATION = re.compile(
+    r"\b(what (?:should|can) i (?:listen to|use|try)|recommend(?:ation| something)?|"
+    r"which (?:audio|boost|collection|program)|suggest (?:an? )?(?:audio|boost|collection|program)|"
+    r"give me (?:an? )?(?:audio|boost|collection|program)|i want (?:an? )?(?:audio|boost|collection|program))\b",
+    re.I,
+)
 
 
 @dataclass(frozen=True)
@@ -89,4 +95,35 @@ def contextual_fallback(persona: str, message: str, intent: ConversationIntent, 
         "I want to understand rather than make assumptions. What is happening for you, and what kind of support would feel useful?"
         if persona == "emma"
         else "I don’t want to assume what you need. What is happening, and what would you like help working through?"
+    )
+
+
+def conversation_stage(message: str, history: list[dict]) -> str:
+    """Require companion exploration before content routing unless the user asks directly."""
+    if EXPLICIT_RECOMMENDATION.search(message):
+        return "RECOMMENDATION"
+    prior_user_turns = sum(1 for item in history[-8:] if item.get("role") == "user")
+    if prior_user_turns == 0:
+        return "DISCOVERY"
+    if prior_user_turns < 2:
+        return "EXPLORATION"
+    return "RECOMMENDATION"
+
+
+def stage_guidance(stage: str) -> str:
+    if stage == "DISCOVERY":
+        return (
+            "This is the user's opening disclosure. Validate the specific experience, reflect its meaning without diagnosis, "
+            "and ask one relevant question that helps understand onset, duration, context, impact, or safety. Do not name, "
+            "offer, or recommend any Blissiree audio, Boost, collection, or Program yet."
+        )
+    if stage == "EXPLORATION":
+        return (
+            "Continue the companion conversation. Reflect the new detail and ask one next useful, non-repetitive question "
+            "based on what remains unclear. Do not name, offer, or recommend a Blissiree audio, Boost, collection, or Program yet."
+        )
+    return (
+        "Enough conversational context is available, or the user directly requested a recommendation. If an eligible exact "
+        "resource is supplied, connect at most one primary recommendation to the user's observable pattern. Otherwise continue "
+        "the conversation without inventing or forcing a recommendation."
     )

@@ -8,7 +8,7 @@ from .providers import AnalysisLLMProvider, ConversationLLMProvider
 from .recommendations import ImmediateSupportEngine, LongTermJourneyEngine, SupportHorizonClassifier
 from .safety import OutputSafetyValidator, TriageEngine, deterministic_crisis_response, terminal_turn_kind, terminal_turn_response
 from .schemas import MentalStateAnalysis, ResponseContract, UserState
-from .conversation_intent import classify_conversation_intent, contextual_fallback
+from .conversation_intent import classify_conversation_intent, contextual_fallback, conversation_stage, stage_guidance
 
 log = logging.getLogger("blissiree.ai")
 
@@ -51,12 +51,15 @@ class BlissireeOrchestrator:
         triage=self.triage.evaluate(safety_context,analysis)
         horizon=self.horizon.classify(safety_context,analysis)
         conversation_intent=classify_conversation_intent(message,analysis)
+        stage=conversation_stage(message,history)
         t=time.perf_counter(); docs=self.repo.retrieve(message) if self.config.rag_enabled else []
         if self.config.rag_enabled and self.training_store:docs.extend(self.training_store.retrieve_knowledge(message,target=persona.upper()))
         retrieval_ms=round((time.perf_counter()-t)*1000)
         immediate,clarification=self.immediate.recommend(safety_context,analysis,triage,self.repo,horizon,bool(recent_user))
         program_assessment=self.long_term.assess(horizon,triage); long_term=[]
         if conversation_intent.mode != "SUPPORT":
+            immediate,clarification,program_assessment=[],None,False
+        elif stage != "RECOMMENDATION":
             immediate,clarification,program_assessment=[],None,False
         contract=ResponseContract(persona=persona,user_state=UserState(triage=triage.level,stress=analysis.stress_score_estimate,
             reported_emotions=analysis.reported_emotions,current_need=analysis.current_need),
@@ -67,7 +70,9 @@ class BlissireeOrchestrator:
                              "boost_first":True,"do_not_append_program_upsell":True},support_horizon=horizon.horizon,
             clarification_question=clarification,program_assessment_required=program_assessment,
             compiled_instructions=[{"id":x["id"],"instruction":x["instruction"],"priority":x["priority"]} for x in (self.training_store.effective(persona.upper()) if self.training_store else [])],
-            interaction_mode=conversation_intent.mode,response_guidance=conversation_intent.guidance)
+            interaction_mode=conversation_intent.mode,
+            response_guidance=" ".join(x for x in (conversation_intent.guidance,stage_guidance(stage)) if x),
+            conversation_stage=stage)
         t=time.perf_counter(); usage={}; validation="fallback"
         if triage.blocks_recommendations:
             text=deterministic_crisis_response(triage.level,message)
@@ -76,7 +81,9 @@ class BlissireeOrchestrator:
         else:
             try:
                 text,usage=self.conversation.generate(contract,message,history)
-                valid,failures=self.validator.validate(text,{r.title for r in immediate+long_term}) if self.config.output_validation_enabled else (True,[])
+                known_titles={x["display_name"] for x in self.repo.catalog["boost_collections"]}|{
+                    "Emotional Empowerment Program","Unstoppable You Program"}
+                valid,failures=self.validator.validate(text,{r.title for r in immediate+long_term},known_titles) if self.config.output_validation_enabled else (True,[])
                 validation="pass" if valid else "failed:"+",".join(failures)
                 if not valid: text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
             except Exception as exc:

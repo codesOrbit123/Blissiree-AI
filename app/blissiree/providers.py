@@ -58,6 +58,10 @@ thanks, and goodbye: acknowledge briefly and end without another question, recom
         system += """ Follow interaction_mode and response_guidance. For OUT_OF_SCOPE requests, acknowledge what the user actually said, briefly state your
 Blissiree emotional-support and personal-development role, and offer a natural optional bridge back; never respond with a generic emotional-state
 question. For REFUSAL, respect the boundary and end without a question. Do not force every message into an emotional problem or recommendation."""
+        system += """ Follow conversation_stage strictly. DISCOVERY and EXPLORATION are companion dialogue: respond to the user's specific words,
+use relevant supplied Terri companion exemplars silently, and ask one useful non-repetitive question. In those stages never name, offer, tease, or
+recommend a Blissiree audio, Boost, collection, or Program—even if retrieved knowledge mentions one. RECOMMENDATION permits only the eligible exact
+resource in immediate_recommendations or long_term_recommendations. Never rush from disclosure to product."""
         prompt = {"response_contract": contract.model_dump(), "recent_history": history[-8:], "user_message": message}
         response = self.client.models.generate_content(
             model=self.config.conversation_model, contents=json.dumps(prompt,ensure_ascii=False),

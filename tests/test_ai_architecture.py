@@ -85,4 +85,8 @@ class TrainingKnowledgeTests(unittest.TestCase):
         rows=rank_training_knowledge(items,"I feel stress and want calm")
         self.assertEqual(rows[0]["id"],"youtube-test")
 
+    def test_inactive_case_study_is_not_retrievable(self):
+        items=[{"id":"youtube-test","title":"Stress story","instruction":"A participant described stress.","status":"DISABLED","kind":"KNOWLEDGE","source":"YOUTUBE_PUBLIC","authority":70}]
+        self.assertEqual(rank_training_knowledge(items,"stress"),[])
+
 if __name__=="__main__": unittest.main()

@@ -22,6 +22,8 @@ BUCKET=os.environ["TRAINING_STORE_BUCKET"]
 MODEL=os.getenv("GEMINI_MODEL","gemini-2.5-flash-lite")
 CHANNELS=[x.strip() for x in os.getenv("CHANNEL_URLS","https://www.youtube.com/@blissiree/videos,https://www.youtube.com/@blissiree/shorts").split(",") if x.strip()]
 MAX_ITEMS=int(os.getenv("MAX_ITEMS","0"))
+REPROCESS=os.getenv("REPROCESS","false").lower() in {"1","true","yes"}
+REQUEST_INTERVAL=float(os.getenv("REQUEST_INTERVAL_SECONDS","4"))
 PREFIX="youtube-ingestion"
 LIBRARY_OBJECT="training-studio/library.json"
 NOW=lambda:datetime.now(timezone.utc).isoformat()
@@ -29,6 +31,22 @@ NOW=lambda:datetime.now(timezone.utc).isoformat()
 storage_client=storage.Client(project=PROJECT)
 bucket=storage_client.bucket(BUCKET)
 gemini=genai.Client(vertexai=True,project=PROJECT,location=REGION)
+last_request_at=0.0
+
+def generate_content(**kwargs):
+    global last_request_at
+    for attempt in range(7):
+        wait=max(0,REQUEST_INTERVAL-(time.monotonic()-last_request_at))
+        if wait:time.sleep(wait)
+        try:
+            last_request_at=time.monotonic()
+            return gemini.models.generate_content(**kwargs)
+        except Exception as exc:
+            if "429" not in str(exc) and "RESOURCE_EXHAUSTED" not in str(exc):raise
+            if attempt==6:raise
+            delay=min(120,10*(2**attempt))
+            log.warning("Gemini quota limited; retrying in %ss",delay)
+            time.sleep(delay)
 
 def run(*args):
     command=list(args)
@@ -86,7 +104,7 @@ def audio_transcript(video,workdir):
     audio=next(workdir.glob(f"{video['id']}*.mp3"))
     object_name=f"{PREFIX}/audio/{audio.name}"
     bucket.blob(object_name).upload_from_filename(audio,content_type="audio/mpeg")
-    response=gemini.models.generate_content(model=MODEL,contents=[types.Part.from_uri(file_uri=f"gs://{BUCKET}/{object_name}",mime_type="audio/mpeg"),"Transcribe this public Blissiree video faithfully. Return only the spoken words. Do not add interpretation."],config=types.GenerateContentConfig(temperature=0,max_output_tokens=8192))
+    response=generate_content(model=MODEL,contents=[types.Part.from_uri(file_uri=f"gs://{BUCKET}/{object_name}",mime_type="audio/mpeg"),"Transcribe this public Blissiree video faithfully. Return only the spoken words. Do not add interpretation."],config=types.GenerateContentConfig(temperature=0,max_output_tokens=8192))
     return response.text.strip(),"gemini_audio_transcription"
 
 def metadata(video):
@@ -94,8 +112,8 @@ def metadata(video):
     return {"id":video["id"],"title":data.get("title") or video["title"],"url":video["url"],"description":data.get("description") or "","duration":data.get("duration"),"upload_date":data.get("upload_date"),"channel":data.get("channel") or "Blissiree","channel_id":data.get("channel_id"),"surface":video["channel_surface"]}
 
 def case_study(meta,transcript):
-    prompt={"task":"Convert a public, consented Blissiree video transcript into grounded companion knowledge.","rules":["Treat it as an individual testimonial or educational video, not medical evidence.","Do not diagnose or create claims not explicitly stated.","Separate participant-reported outcomes from Blissiree explanations.","Extract non-medical language and supportive conversation lessons Emma and Ben can use.","Never generalize an individual outcome as guaranteed or universal.","Do not turn comparisons to drugs or medication, treatment or diagnosis language, or claimed brain/body changes into companion lessons; put them only in claims_to_avoid."],"required_json":{"content_type":"testimonial|educational|marketing|other","story_summary":"string","situation_and_feelings":["string"],"support_elements":["string"],"participant_reported_outcomes":["string"],"helpful_language_patterns":["string"],"companion_lessons":["string"],"claims_to_avoid":["string"]},"source":meta,"transcript":transcript[:40000]}
-    response=gemini.models.generate_content(model=MODEL,contents=json.dumps(prompt,ensure_ascii=False),config=types.GenerateContentConfig(temperature=0,response_mime_type="application/json",max_output_tokens=4096))
+    prompt={"task":"Convert a public, consented Blissiree video transcript into silent behavioral grounding for Emma and Ben.","rules":["Learn what kinds of people, language, circumstances, communication styles, and immediate support needs the companions may encounter.","Treat every outcome as an individual report, not evidence or an expected result.","Do not create diagnoses or fixed labels for a person.","Extract safe empathy, clarification, support-selection, refusal, resolution, and conversation-closure patterns.","The companion must not mention or use the testimonial to persuade unless a user explicitly requests other people's experiences.","Exclude promotional persuasion, guarantees, comparisons to drugs or medication, treatment or diagnosis language, and claimed brain/body changes from learned behavior; put them only in claims_to_avoid."],"required_json":{"content_type":"testimonial|educational|marketing|other","story_summary":"string","user_language_signals":[{"language":"string","possible_interaction_need":"string"}],"communication_styles":["brief|detailed|uncertain|skeptical|practical|emotionally_intense|other"],"situations_and_feelings":["string"],"interaction_needs":["validation|clarification|calming|practical_step|being_heard|choice|closure|safety_support|other"],"safe_response_patterns":["string"],"support_elements":["string"],"participant_reported_outcomes":["string"],"conversation_boundaries":["string"],"claims_to_avoid":["string"]},"source":meta,"transcript":transcript[:40000]}
+    response=generate_content(model=MODEL,contents=json.dumps(prompt,ensure_ascii=False),config=types.GenerateContentConfig(temperature=0,response_mime_type="application/json",max_output_tokens=4096))
     return json.loads(response.text)
 
 def publish_library(meta,study,transcript_source):
@@ -123,7 +141,7 @@ def main():
     videos=discover();manifest["discovered"]=len(videos);upload_json(f"{PREFIX}/manifest.json",manifest)
     log.info("discovered %d unique videos and shorts",len(videos))
     for index,video in enumerate(videos,1):
-        if manifest["processed"].get(video["id"]):continue
+        if manifest["processed"].get(video["id"]) and not REPROCESS:continue
         try:
             with tempfile.TemporaryDirectory() as tmp:
                 workdir=Path(tmp);staged=load_json(f"{PREFIX}/staged/{video['id']}.json",None)

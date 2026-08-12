@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).parents[1]/"app"))
 from blissiree.schemas import MentalStateAnalysis
-from blissiree.safety import OutputSafetyValidator,TriageEngine,terminal_turn_kind,terminal_turn_response
+from blissiree.safety import OutputSafetyValidator,TriageEngine,deterministic_crisis_response,terminal_turn_kind,terminal_turn_response
 from blissiree.recommendations import SupportHorizonClassifier,ImmediateSupportEngine
 from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
 
@@ -17,6 +17,10 @@ class TriageTests(unittest.TestCase):
     def test_medical(self): self.assertEqual(self.level("I have chest pain"),"T4")
     def test_unexplained_weakness_red_flag(self): self.assertEqual(self.level("I have sudden one-sided weakness and slurred speech"),"T4")
     def test_drowsy_driving_red_flag(self): self.assertEqual(self.level("I am falling asleep while driving"),"T4")
+    def test_drowsy_driving_stops_activity_before_escalation(self):
+        reply=deterministic_crisis_response("T4","I keep falling asleep while driving")
+        self.assertIn("stop driving",reply.lower())
+        self.assertIn("safe alternative transport",reply.lower())
     def test_coercive_control(self): self.assertEqual(self.level("My partner controls my money and movement"),"T3")
     def test_severe(self): self.assertEqual(self.level("I can't cope anymore"),"T5")
     def test_moderate(self): self.assertEqual(self.level("I feel overwhelmed"),"T6")

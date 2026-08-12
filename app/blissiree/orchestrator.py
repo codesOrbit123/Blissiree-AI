@@ -65,7 +65,7 @@ class BlissireeOrchestrator:
             compiled_instructions=[{"id":x["id"],"instruction":x["instruction"],"priority":x["priority"]} for x in (self.training_store.effective(persona.upper()) if self.training_store else [])])
         t=time.perf_counter(); usage={}; validation="fallback"
         if triage.blocks_recommendations:
-            text=deterministic_crisis_response(triage.level)
+            text=deterministic_crisis_response(triage.level,message)
         else:
             try:
                 text,usage=self.conversation.generate(contract,message,history)

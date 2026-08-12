@@ -67,7 +67,9 @@ class OutputSafetyValidator:
             failures.append("unsupported_program")
         return not failures, failures
 
-def deterministic_crisis_response(level: str) -> str:
+def deterministic_crisis_response(level: str, message: str = "") -> str:
+    if level == "T4" and re.search(r"\b(falling asleep|fell asleep).{0,30}\b(driving|machinery)\b",message,re.I):
+        return "Please stop driving or operating machinery now and arrange safe alternative transport or ask someone nearby to help. Blissiree content is not appropriate until your immediate safety is addressed. If you cannot stay safely awake or your symptoms are sudden or severe, contact your local emergency services."
     if level in {"T0","T1","T2","T3","T4"}:
         return "Your immediate safety matters most. Please contact your local emergency services now and reach out to a trusted person nearby who can stay with you. Blissiree cannot provide emergency or medical support. Are you in immediate danger right now?"
     return "It sounds like you are carrying a lot right now. Let’s keep this gentle and focus on one small, safe next step. What feels most urgent in this moment?"

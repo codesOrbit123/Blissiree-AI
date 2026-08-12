@@ -36,6 +36,10 @@ class OutputTests(unittest.TestCase):
     def test_internal_contract_leak_rejected(self): self.assertFalse(OutputSafetyValidator().validate("{'response_contract': {'persona': 'emma', 'compiled_instructions': []}}",set())[0])
     def test_ineligible_known_title_rejected(self):
         self.assertFalse(OutputSafetyValidator().validate("Try the Sleep Support Collection.",set(),{"Sleep Support Collection"})[0])
+    def test_invented_named_boost_rejected(self):
+        valid,failures=OutputSafetyValidator().validate("I recommend the **Calm Mind Boost**.",{"Anxious Thoughts Support Collection"})
+        self.assertFalse(valid)
+        self.assertIn("unapproved_named_resource",failures)
 
 class RecommendationTests(unittest.TestCase):
     immediate=[

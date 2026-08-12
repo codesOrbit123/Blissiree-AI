@@ -66,6 +66,9 @@ class OutputSafetyValidator:
             if title in text and title not in allowed_titles:
                 failures.append("ineligible_recommendation")
                 break
+        named_resource=re.search(r"(?:the\s+)?(?:\*\*)?([A-Z][A-Za-z&'’ -]{2,80}\s(?:Boost|Audio|Program))(?:\*\*)?",text)
+        if named_resource and not any(title in text for title in allowed_titles):
+            failures.append("unapproved_named_resource")
         invented_program = re.search(r"\bprogram called\s+[\"']?([^\"'.\n]+)", text, re.I)
         if invented_program and not any(title.lower() in invented_program.group(1).lower() for title in allowed_titles):
             failures.append("unsupported_program")

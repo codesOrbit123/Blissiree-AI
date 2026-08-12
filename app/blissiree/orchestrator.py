@@ -82,6 +82,7 @@ class BlissireeOrchestrator:
             try:
                 text,usage=self.conversation.generate(contract,message,history)
                 known_titles={x["display_name"] for x in self.repo.catalog["boost_collections"]}|{
+                    x["display_title"] for x in self.repo.catalog["boosts"]}|{
                     "Emotional Empowerment Program","Unstoppable You Program"}
                 valid,failures=self.validator.validate(text,{r.title for r in immediate+long_term},known_titles) if self.config.output_validation_enabled else (True,[])
                 validation="pass" if valid else "failed:"+",".join(failures)
@@ -95,5 +96,6 @@ class BlissireeOrchestrator:
             "support_horizon":horizon.horizon,"boost_relevance_score":horizon.boost_relevance,"program_relevance_score":horizon.program_relevance,
             "latency_analysis_ms":analysis_ms,"latency_retrieval_ms":retrieval_ms,"latency_generation_ms":generation_ms,
             "latency_total_ms":round((time.perf_counter()-started)*1000),"token_usage":usage,"model_errors":errors,"output_validation_result":validation}
+        event["conversation_stage"]=stage
         log.info(json.dumps(event,separators=(",",":")))
         return {"message":text,"persona":persona,"triage":triage.level,"request_id":request_id,"sources":sorted({d["source"] for d in docs})}

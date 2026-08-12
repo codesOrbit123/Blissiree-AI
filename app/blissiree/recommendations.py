@@ -56,7 +56,7 @@ class ImmediateSupportEngine:
                 item=repo.collection(collection_id)
                 if item and collection_id not in [m[0] for m in matches]: matches.append((collection_id,item))
         if not matches:
-            return [],None if has_context else "Is it more that your thoughts won’t settle, you’re feeling low, or something specific happened today?"
+            return [],None
         primary=matches[0][1]
         rec=Recommendation(id=primary["id"],title=primary["display_name"],reason="Matches your dominant immediate need.",source=primary["source"])
         return [rec],None

@@ -27,6 +27,7 @@ class GeminiProvider(AnalysisLLMProvider, ConversationLLMProvider, EmbeddingProv
         prompt = """Extract only user-reported, non-diagnostic observations. Do not infer diagnoses.
 Classify support_horizon as IMMEDIATE, SHORT_TERM, LONG_TERM, BOTH, or UNCLEAR. Current/today/tonight needs favor Boost;
 only explicit program requests, persistent/repeated patterns, or desire for structured deeper change favor program intent.
+Classify intent as off_topic when the request is unrelated to emotional wellbeing, personal development, Blissiree content, or the current conversation.
 Return separate boost and program relevance. JSON input:\n""" + str(payload)
         response = self.client.models.generate_content(
             model=self.config.analysis_model, contents=prompt,
@@ -53,6 +54,9 @@ evidence, testimonials, or other people's experiences. Never use a story to pers
 explicitly asks for experiences, attribute each one as an individual personal report. Never repeat comparisons to drugs or medication,
 treatment/diagnosis claims, or claimed brain/body changes. Typical response under 130 words. Ask at most one question. Respect resolution, refusal,
 thanks, and goodbye: acknowledge briefly and end without another question, recommendation, or attempt to continue."""
+        system += """ Follow interaction_mode and response_guidance. For OUT_OF_SCOPE requests, acknowledge what the user actually said, briefly state your
+Blissiree emotional-support and personal-development role, and offer a natural optional bridge back; never respond with a generic emotional-state
+question. For REFUSAL, respect the boundary and end without a question. Do not force every message into an emotional problem or recommendation."""
         prompt = {"response_contract": contract.model_dump(), "recent_history": history[-8:], "user_message": message}
         response = self.client.models.generate_content(
             model=self.config.conversation_model, contents=json.dumps(prompt,ensure_ascii=False),

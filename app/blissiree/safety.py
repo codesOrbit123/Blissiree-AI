@@ -58,7 +58,7 @@ class OutputSafetyValidator:
     ]
     def validate(self, text: str, allowed_titles: set[str]) -> tuple[bool, list[str]]:
         failures = [p.pattern for p in self.prohibited if p.search(text)]
-        leakage_markers=("response_contract","compiled_instructions","allowed_actions","retrieved_knowledge","response_limits","program_assessment_required","'persona':","\"persona\":")
+        leakage_markers=("response_contract","compiled_instructions","allowed_actions","retrieved_knowledge","response_limits","program_assessment_required","interaction_mode","response_guidance","'persona':","\"persona\":")
         if any(marker in text for marker in leakage_markers) or re.match(r"^\s*[\[{]",text):failures.append("internal_configuration_leak")
         if re.search(r"\bCollection\b", text) and not any(title in text for title in allowed_titles):
             failures.append("unsupported_collection")

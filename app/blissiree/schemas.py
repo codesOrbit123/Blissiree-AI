@@ -46,3 +46,5 @@ class ResponseContract(BaseModel):
     clarification_question: str | None = None
     program_assessment_required: bool = False
     compiled_instructions: list[dict] = []
+    interaction_mode: Literal["SUPPORT", "CASUAL", "OUT_OF_SCOPE", "REFUSAL"] = "SUPPORT"
+    response_guidance: str | None = None

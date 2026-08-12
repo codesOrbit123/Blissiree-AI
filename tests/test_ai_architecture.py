@@ -7,6 +7,7 @@ from blissiree.schemas import MentalStateAnalysis
 from blissiree.safety import OutputSafetyValidator,TriageEngine,deterministic_crisis_response,terminal_turn_kind,terminal_turn_response
 from blissiree.recommendations import SupportHorizonClassifier,ImmediateSupportEngine
 from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
+from blissiree.conversation_intent import classify_conversation_intent,contextual_fallback
 
 class TriageTests(unittest.TestCase):
     def setUp(self): self.engine=TriageEngine()
@@ -92,6 +93,32 @@ class ConversationEndingTests(unittest.TestCase):
         self.assertNotIn("Collection",terminal_turn_response("emma","thanks"))
     def test_safety_language_overrides_goodbye(self):
         self.assertIsNone(terminal_turn_kind("goodbye, I am going to kill myself",self.triage))
+
+class ConversationRelevanceTests(unittest.TestCase):
+    def test_hostile_refusal_respects_space_without_question(self):
+        intent=classify_conversation_intent("get lost",MentalStateAnalysis())
+        self.assertEqual(intent.mode,"REFUSAL")
+        reply=contextual_fallback("emma","get lost",intent,False)
+        self.assertNotIn("?",reply)
+        self.assertNotIn("thoughts won",reply.lower())
+
+    def test_out_of_scope_request_redirects_to_core_role(self):
+        intent=classify_conversation_intent("What is the bitcoin price?",MentalStateAnalysis())
+        self.assertEqual(intent.mode,"OUT_OF_SCOPE")
+        reply=contextual_fallback("ben","What is the bitcoin price?",intent,False)
+        self.assertIn("emotional wellbeing",reply)
+        self.assertNotIn("thoughts won",reply.lower())
+
+    def test_casual_greeting_is_answered_naturally(self):
+        intent=classify_conversation_intent("hello",MentalStateAnalysis())
+        self.assertEqual(intent.mode,"CASUAL")
+        self.assertIn("Hi, I’m Emma",contextual_fallback("emma","hello",intent,False))
+
+    def test_unknown_support_fallback_does_not_use_stock_question(self):
+        intent=classify_conversation_intent("Something happened",MentalStateAnalysis())
+        reply=contextual_fallback("emma","Something happened",intent,False)
+        self.assertNotIn("thoughts won",reply.lower())
+
 
 class TrainingKnowledgeTests(unittest.TestCase):
     def test_active_case_study_is_retrievable(self):

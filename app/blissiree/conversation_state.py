@@ -89,7 +89,9 @@ def information_quality_failures(text:str,context:ConversationContext) -> list[s
     failures=[];lower=text.lower()
     if re.match(r"\s*(it sounds like|you seem|i hear (?:that )?you)",lower):failures.append("indirect_information_opening")
     if not text.strip():failures.append("empty_answer")
-    if context.active_topic=="BLISSIREE_OVERVIEW" and "blissiree" not in lower:failures.append("missing_platform_answer")
+    if context.active_topic=="BLISSIREE_OVERVIEW":
+        concrete=sum(term in lower for term in ("emma","ben","boost library","emotional empowerment","unstoppable you","terri","brain reset"))
+        if "blissiree" not in lower or concrete<2:failures.append("missing_platform_answer")
     if context.active_topic=="BLISSIREE_PROGRAMS" and not any(x in lower for x in ("emotional empowerment","unstoppable you","boost library")):failures.append("missing_program_answer")
     if "LOW_CONFIDENCE" in context.current_explicit_themes and context.active_topic=="BLISSIREE_OVERVIEW" and "confidence" not in lower:
         failures.append("missing_relevant_confidence_context")

@@ -291,6 +291,10 @@ class ContextEngineTests(unittest.TestCase):
     def test_indirect_curiosity_opening_fails_information_quality(self):
         context=ConversationContext(intent="PRODUCT_INFORMATION",active_topic="BLISSIREE_OVERVIEW")
         self.assertIn("indirect_information_opening",information_quality_failures("It sounds like you're curious about Blissiree.",context))
+    def test_vague_platform_answer_fails_information_quality(self):
+        context=ConversationContext(intent="PRODUCT_INFORMATION",active_topic="BLISSIREE_OVERVIEW",current_explicit_themes=["LOW_CONFIDENCE"])
+        failures=information_quality_failures("Blissiree offers resources for low confidence.",context)
+        self.assertIn("missing_platform_answer",failures)
     def test_short_answer_is_reconciled_with_pending_program_question(self):
         context=ConversationContext(intent="COMPANION_SUPPORT",active_topic="USER_SITUATION",question_to_answer="What support does the user need?")
         history=[{"role":"assistant","content":"Blissiree offers Emotional Empowerment and Unstoppable You. Which program would you like explained?"}]

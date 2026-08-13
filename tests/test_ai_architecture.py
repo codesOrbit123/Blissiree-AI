@@ -137,7 +137,16 @@ class ConversationRelevanceTests(unittest.TestCase):
     def test_casual_greeting_is_answered_naturally(self):
         intent=classify_conversation_intent("hello",MentalStateAnalysis())
         self.assertEqual(intent.mode,"CASUAL")
-        self.assertIn("Hi, I’m Emma",contextual_fallback("emma","hello",intent,False))
+        reply=contextual_fallback("emma","hello",intent,False)
+        self.assertIn("I’m Emma, your Blissiree AI assistant",reply)
+        self.assertIn("consultation with Terri",reply)
+
+    def test_how_are_you_is_answered_before_role_guidance(self):
+        intent=classify_conversation_intent("Hey Emma how are you",MentalStateAnalysis())
+        self.assertEqual(intent.mode,"CASUAL")
+        reply=contextual_fallback("emma","Hey Emma how are you",intent,False)
+        self.assertTrue(reply.startswith("I’m doing well, thank you for asking."))
+        self.assertIn("Program or Boost audio",reply)
 
     def test_unknown_support_fallback_does_not_use_stock_question(self):
         intent=classify_conversation_intent("Something happened",MentalStateAnalysis())

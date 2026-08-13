@@ -14,7 +14,7 @@ OFF_TOPIC = re.compile(
     r"translate this|book a flight|order food)\b",
     re.I,
 )
-CASUAL = re.compile(r"^\s*(hi|hello|hey|what'?s up|how are you|who are you|what can you do)[\s?!.]*$", re.I)
+CASUAL = re.compile(r"^\s*(?:(?:hi|hello|hey)(?:\s+(?:emma|ben))?(?:\s*,?\s*)?)?(?:how are you|what'?s up|who are you|what can you do)?[\s?!.]*$", re.I)
 FEEDBACK = re.compile(
     r"\b(you(?:'re| are) (?:too )?(?:rude|cold|robotic|repetitive|not listening)|"
     r"that was rude|you don'?t understand|you are not helping|that wasn'?t helpful|"
@@ -56,7 +56,7 @@ def classify_conversation_intent(message: str, analysis: MentalStateAnalysis) ->
             "defending yourself, repeating emotional validation, or recommending content. Ask at most one short question "
             "about how the user would prefer you to respond.",
         )
-    if CASUAL.fullmatch(message):
+    if message.strip() and CASUAL.fullmatch(message):
         return ConversationIntent(
             "CASUAL",
             "Respond naturally to the greeting or capability question, briefly describe your Blissiree companion role, and invite the user to share what kind of emotional or personal-development support would help.",
@@ -93,10 +93,16 @@ def contextual_fallback(persona: str, message: str, intent: ConversationIntent, 
             else "That specific request is outside my role. I focus on emotional wellbeing and practical personal-development support. If it is creating stress or affecting you, tell me which part you want to work through."
         )
     if intent.mode == "CASUAL":
+        if re.search(r"\bhow are you\b",message,re.I):
+            return (
+                "I’m doing well, thank you for asking. I’m Emma, your Blissiree AI assistant. I can chat with you for emotional support, explain Blissiree and its offerings, help you find a suitable Program or Boost audio, or help you book a consultation with Terri. What would you like today?"
+                if persona == "emma"
+                else "I’m doing well, thanks for asking. I’m Ben, your Blissiree AI assistant. I can talk things through with you, explain Blissiree and its offerings, help match a Program or Boost audio to your needs, or help you book a consultation with Terri. Which would be useful today?"
+            )
         return (
-            "Hi, I’m Emma. I’m here for gentle emotional support and personal development. What would feel helpful today?"
+            "Hello, I’m Emma, your Blissiree AI assistant. I can chat with you for emotional support, explain Blissiree and its offerings, help you find a suitable Program or Boost audio, or help you book a consultation with Terri. What would you like today?"
             if persona == "emma"
-            else "Hi, I’m Ben. I offer calm, practical support for emotional wellbeing and personal development. What would you like to work through?"
+            else "Hello, I’m Ben, your Blissiree AI assistant. I can talk things through with you, explain Blissiree and its offerings, help match a Program or Boost audio to your needs, or help you book a consultation with Terri. Which would be useful today?"
         )
     if intent.mode == "FEEDBACK":
         return (

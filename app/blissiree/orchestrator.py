@@ -59,6 +59,19 @@ class BlissireeOrchestrator:
                 "output_validation_result":"pass:terminal_"+terminal_kind}
             log.info(json.dumps(event,separators=(",",":")))
             return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":[],"active_agent":public_agent(route)}
+        casual_intent=classify_conversation_intent(message,MentalStateAnalysis())
+        if casual_intent.mode=="CASUAL":
+            route=route_capability(ConversationContext(),history)
+            text=contextual_fallback(persona,message,casual_intent,bool(history))
+            text=self._rewrite(text,persona,message,history,"CASUAL",errors)
+            event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
+                "conversation_model":self.config.conversation_model,"triage_level":"T7","retrieved_content_ids":[],"recommended_boost_ids":[],
+                "recommended_program_id":None,"support_horizon":"UNCLEAR","boost_relevance_score":"VERY_LOW","program_relevance_score":"VERY_LOW",
+                "latency_analysis_ms":0,"latency_retrieval_ms":0,"latency_generation_ms":round((time.perf_counter()-started)*1000),
+                "latency_total_ms":round((time.perf_counter()-started)*1000),"token_usage":{},"model_errors":errors,
+                "output_validation_result":"pass:casual"}
+            log.info(json.dumps(event,separators=(",",":")))
+            return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":[],"active_agent":public_agent(route)}
         context_started=time.perf_counter()
         try:context=self.analysis.contextualize(message,history) if self.config.analysis_enabled else fallback_context(message,history)
         except Exception as exc:

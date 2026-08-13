@@ -186,6 +186,12 @@ class ProductInformationTests(unittest.TestCase):
     def test_program_overview_uses_exact_offerings(self):
         text=product_information_response("What programs does Blissiree offer?",[])
         self.assertIn("Emotional Empowerment Program",text);self.assertIn("Unstoppable You Program",text)
+    def test_generic_followup_does_not_select_assistant_mentioned_consultation(self):
+        history=[{"role":"user","content":"what programs blissiree has to offer"},
+                 {"role":"assistant","content":"Programs, Boost Library and consultations with Terri are available."}]
+        text=product_information_response("yes please share details",history)
+        self.assertIn("Emotional Empowerment Program",text)
+        self.assertNotIn("free 25-minute discovery call",text)
     def test_official_site_knowledge_is_loaded(self):
         repo=KnowledgeRepository(Path(__file__).parents[1]/"knowledge")
         self.assertTrue(any(d["source"]=="BLISSIREE_OFFICIAL_WEBSITE" for d in repo.documents))

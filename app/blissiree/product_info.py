@@ -14,7 +14,7 @@ def is_product_information_request(message,history):
     return bool(PRODUCT_QUERY.search(recent) or re.search(r"\b(Blissiree|Emotional Empowerment|Unstoppable You|Boost Library)\b",recent,re.I))
 
 def product_information_response(message,history):
-    context=(" ".join(str(x.get("content","")) for x in history[-4:])+" "+message).lower()
+    context=(" ".join(str(x.get("content","")) for x in history[-6:] if x.get("role")=="user")+" "+message).lower()
     if "consult" in context:
         return "Blissiree also offers consultations with Terri. The official site describes a free 25-minute discovery call, an introductory session, and a personalised 14-session journey. Current availability and booking details are on blissiree.com/consultations."
     if "boost" in context or "audio" in context or "brain reset" in context:

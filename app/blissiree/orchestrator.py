@@ -164,17 +164,17 @@ class BlissireeOrchestrator:
                 review_failures=self.reviewer.review(text,message,history,"SUPPORT").failures
                 failures.extend(progress_failures+persona_failures+review_failures);valid=valid and not progress_failures and not persona_failures and not review_failures
                 validation="pass" if valid else "failed:"+",".join(failures)
-                if not valid and (progress_failures or persona_failures):
+                if not valid and (progress_failures or persona_failures or review_failures):
                     text,usage=self.conversation.generate(contract,message,history,"; ".join(progress_failures+persona_failures+review_failures))
                     valid,failures=self.validator.validate(text,{r.title for r in immediate+long_term},known_titles) if self.config.output_validation_enabled else (True,[])
                     remaining=response_progress_failures(text,history,stage)+recommendation_fulfilment_failures(text,[r.title for r in immediate+long_term],stage)+persona_quality_failures(text,persona,history,message,"SUPPORT")+self.reviewer.review(text,message,history,"SUPPORT").failures
                     if remaining or not valid:
                         text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user)) if immediate else self.reviewer.fallback(persona,message,history)
                     validation="pass:regenerated" if not remaining and valid else "fallback:"+",".join(remaining or failures)
-                elif not valid:text=progress_fallback(persona,message,history) if conversation_intent.mode=="SUPPORT" and history else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
+                elif not valid:text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user)) if immediate else self.reviewer.fallback(persona,message,history)
             except Exception as exc:
                 errors.append(f"generation:{type(exc).__name__}")
-                text=progress_fallback(persona,message,history) if conversation_intent.mode=="SUPPORT" and history else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
+                text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user)) if immediate else self.reviewer.fallback(persona,message,history)
         generation_ms=round((time.perf_counter()-t)*1000)
         event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
             "conversation_model":self.config.conversation_model,"triage_level":triage.level,"retrieved_content_ids":[d["id"] for d in docs],

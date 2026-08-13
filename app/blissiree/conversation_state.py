@@ -63,8 +63,9 @@ def apply_latest_message_authority(context:ConversationContext,message:str,histo
                                   "question_to_answer":"Acknowledge that the user meant confidence, not sadness, then continue naturally.",
                                   "current_explicit_themes":["LOW_CONFIDENCE"],"reported_emotions":[]})
     direct_content=bool(re.search(r"\b(anything|something|what)\b.{0,35}\bblissi\w*\b.{0,35}\b(offer|audio|boost|program|content)\b|\bblissi\w*\b.{0,35}\b(offer|audio|boost|program|content)\b",message,re.I))
+    direct_content=direct_content or bool(re.search(r"\b(which|what|recommend|suggest)\b.{0,35}\b(audio|boost|collection|program)\b|\b(audio|boost|collection|program)\b.{0,25}\b(should i|for me|listen to|recommend)\b",message,re.I))
     if direct_content:
-        topic="work stress content" if re.search(r"\b(work|workload|too m(?:u|ch)+ch work|deadline)\b",message,re.I) else None
+        topic="work stress content" if re.search(r"\b(work|workload|too m(?:u|ch)+ch work|deadline|stress|stressed)\b",message,re.I) else None
         updates.update({"intent":"RESOURCE_GUIDANCE","active_topic":"USER_SITUATION","conversation_stage":"RECOMMENDATION",
                         "needs_clarification":topic is None,"resolved_reference":topic,"pending_offer_type":"BOOST_RECOMMENDATION",
                         "user_goal":topic or "find relevant Blissiree content","question_to_answer":"Match approved Blissiree content to the user's current request."})

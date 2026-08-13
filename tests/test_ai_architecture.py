@@ -289,6 +289,10 @@ class ContextEngineTests(unittest.TestCase):
         self.assertEqual(result.intent,"RESOURCE_GUIDANCE")
         self.assertEqual(result.resolved_reference,"work stress content")
         self.assertFalse(result.needs_clarification)
+    def test_direct_stress_audio_request_routes_without_brand_name(self):
+        result=apply_latest_message_authority(ConversationContext(),"i am in stress which audio should i listen too",[])
+        self.assertEqual(result.intent,"RESOURCE_GUIDANCE")
+        self.assertEqual(result.resolved_reference,"work stress content")
 
 class CapabilityRouterTests(unittest.TestCase):
     def route(self,intent,history=None,**kwargs):

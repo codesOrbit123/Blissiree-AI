@@ -12,6 +12,7 @@ from blissiree.product_info import is_product_information_request,product_inform
 from blissiree.intent_router import BOOKING_URL,consultation_booking_response,route_top_level_intent
 from blissiree.conversation_state import conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,response_progress_failures,support_progress_stage
 from blissiree.schemas import ConversationContext
+from blissiree.persona import persona_quality_failures,persona_requirements
 
 class TriageTests(unittest.TestCase):
     def setUp(self): self.engine=TriageEngine()
@@ -233,7 +234,11 @@ class ConversationProgressTests(unittest.TestCase):
     def test_persona_fallbacks_are_distinct_and_contextual(self):
         emma=progress_fallback("emma","I am stuck in thoughts of her",self.history)
         ben=progress_fallback("ben","I am stuck in thoughts of her",self.history)
-        self.assertIn("white fur",emma);self.assertIn("feet on the floor",ben);self.assertNotEqual(emma,ben)
+        self.assertIn("losing your cat",emma);self.assertIn("feet on the floor",ben);self.assertNotEqual(emma,ben)
+    def test_fallback_never_invents_colour_from_another_thread(self):
+        history=[{"role":"user","content":"my cat died in a car accident"}]
+        text=progress_fallback("emma","I want some peace of mind",history)
+        self.assertNotIn("white",text.lower());self.assertIn("accident",text.lower())
 
 class ContextEngineTests(unittest.TestCase):
     def test_natural_platform_language_routes_to_overview(self):
@@ -256,6 +261,23 @@ class ContextEngineTests(unittest.TestCase):
         history=[{"role":"assistant","content":"Blissiree offers Emotional Empowerment and Unstoppable You. Which program would you like explained?"}]
         result=reconcile_context(context,"emotional support",history)
         self.assertEqual(result.intent,"PRODUCT_INFORMATION");self.assertEqual(result.active_topic,"BLISSIREE_PROGRAMS")
+
+class PersonaContractTests(unittest.TestCase):
+    def test_terri_persona_contract_applies_to_both_personas(self):
+        self.assertIn("trauma-aware"," ".join(persona_requirements("emma")))
+        self.assertIn("grounded"," ".join(persona_requirements("ben")))
+    def test_generic_it_sounds_like_opening_is_rejected(self):
+        failures=persona_quality_failures("It sounds like you're feeling sad.","emma",[],"I am sad","SUPPORT")
+        self.assertIn("generic_or_mechanical_opening",failures)
+    def test_stacked_dramatic_language_is_rejected(self):
+        text="That was a truly terrifying and deeply traumatic event."
+        self.assertIn("stacked_emotional_intensifiers",persona_quality_failures(text,"emma",[],"My cat died","SUPPORT"))
+    def test_unstated_colour_is_rejected(self):
+        failures=persona_quality_failures("The memory of her white fur is close.","emma",[],"My cat died in an accident","SUPPORT")
+        self.assertIn("invented_thread_detail",failures)
+    def test_stated_colour_is_allowed(self):
+        failures=persona_quality_failures("The memory of her white fur is close.","emma",[{"role":"user","content":"Her colour was white"}],"I miss her","SUPPORT")
+        self.assertNotIn("invented_thread_detail",failures)
 
 class ConsultationBookingTests(unittest.TestCase):
     def test_direct_free_consultation_booking_is_routed(self):

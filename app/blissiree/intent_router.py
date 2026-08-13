@@ -39,7 +39,7 @@ def route_top_level_intent(message: str, history: list[dict]) -> RoutedIntent:
     return RoutedIntent("COMPANION_OR_INFORMATION")
 
 
-def consultation_booking_response(service: str | None) -> str:
+def consultation_booking_response(service: str | None,persona: str="emma") -> str:
     if service == "FREE_CONSULTATION":
         lead = "The best match is the Free Consultation, a 25-minute discovery call with Terri."
     elif service == "INTRODUCTORY_SESSION":
@@ -49,5 +49,6 @@ def consultation_booking_response(service: str | None) -> str:
     else:
         lead = ("Terri currently offers a Free Consultation (25-minute discovery call), an Introductory Session, "
                 "and a Personalised Program (14 sessions). You can choose the appropriate service in the booking portal.")
-    return (f"{lead}\n\nView live availability, choose a time, and complete any required payment here:\n{BOOKING_URL}\n\n"
+    transition=("I’ll make the next step simple." if persona=="ben" else "I can gently guide you to the next step.")
+    return (f"{lead} {transition}\n\nView live availability, choose a time, and complete any required payment here:\n{BOOKING_URL}\n\n"
             "Blissiree provides wellbeing and personal-development support, not medical care.")

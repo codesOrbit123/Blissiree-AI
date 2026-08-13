@@ -12,6 +12,7 @@ from .conversation_intent import classify_conversation_intent, contextual_fallba
 from .product_info import contextual_product_fallback
 from .intent_router import route_top_level_intent,consultation_booking_response
 from .conversation_state import context_query,conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,response_progress_failures,support_progress_stage
+from .persona import persona_quality_failures,persona_requirements
 
 log = logging.getLogger("blissiree.ai")
 
@@ -53,7 +54,7 @@ class BlissireeOrchestrator:
         booking_safety_context="\n".join([str(x.get("content","")) for x in history[-4:] if x.get("role")=="user"]+[message])
         booking_safety=self.triage.evaluate(booking_safety_context,MentalStateAnalysis())
         if (context.intent=="CONSULTATION_BOOKING" or routed_intent.kind == "CONSULTATION_BOOKING") and not booking_safety.blocks_recommendations:
-            text=consultation_booking_response(routed_intent.service)
+            text=consultation_booking_response(routed_intent.service,persona)
             event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
                 "conversation_model":self.config.conversation_model,"triage_level":"T7","retrieved_content_ids":["official-site:consultations"],
                 "recommended_boost_ids":[],"recommended_program_id":None,"support_horizon":"UNCLEAR","boost_relevance_score":"VERY_LOW",
@@ -70,15 +71,15 @@ class BlissireeOrchestrator:
                 response_limits={"avoid_diagnosis":True,"avoid_medical_claims":True,"answer_question_directly":True},support_horizon="UNCLEAR",
                 interaction_mode="INFORMATION",response_guidance="Answer the actual product question directly from approved official knowledge.",conversation_stage="INFORMATION",
                 conversation_brief="Known context: "+"; ".join(context.known_facts+context.already_answered),question_to_answer=context.question_to_answer,
-                persona_requirements=(["Warm but direct; do not manufacture an emotional reflection for a factual question."] if persona=="emma" else ["Clear, concise and structured."]))
+                persona_requirements=persona_requirements(persona))
             t=time.perf_counter();usage={};failures=[]
             product_titles={"Emotional Empowerment Program","Unstoppable You Program"}
             try:
                 text,usage=self.conversation.generate(contract,message,history)
-                failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)
+                failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)+persona_quality_failures(text,persona,history,message,"INFORMATION")
                 if failures:
                     text,usage=self.conversation.generate(contract,message,history,"; ".join(failures))
-                    failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)
+                    failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)+persona_quality_failures(text,persona,history,message,"INFORMATION")
                 if failures:text=contextual_product_fallback(context,message,history)
             except Exception as exc:
                 errors.append(f"information_generation:{type(exc).__name__}");text=contextual_product_fallback(context,message,history)
@@ -129,8 +130,7 @@ class BlissireeOrchestrator:
             interaction_mode=conversation_intent.mode,
             response_guidance=" ".join(x for x in (conversation_intent.guidance,stage_guidance(stage)) if x),
             conversation_stage=stage,conversation_brief=" ".join(context.known_facts) or conversation_brief(message,history),question_to_answer=context.question_to_answer,
-            persona_requirements=(["Name the specific emotion or detail already shared.","Create emotional safety before guidance.","Use gentle, natural language and one unhurried next step."] if persona=="emma" else
-                                  ["Summarize the concrete situation clearly.","Provide stability through structure.","Offer one practical, manageable next step."]))
+            persona_requirements=persona_requirements(persona))
         t=time.perf_counter(); usage={}; validation="fallback"
         if triage.blocks_recommendations:
             text=deterministic_crisis_response(triage.level,message)
@@ -144,9 +144,16 @@ class BlissireeOrchestrator:
                     "Emotional Empowerment Program","Unstoppable You Program"}
                 valid,failures=self.validator.validate(text,{r.title for r in immediate+long_term},known_titles) if self.config.output_validation_enabled else (True,[])
                 progress_failures=response_progress_failures(text,history,stage)
-                failures.extend(progress_failures);valid=valid and not progress_failures
+                persona_failures=persona_quality_failures(text,persona,history,message,"SUPPORT")
+                failures.extend(progress_failures+persona_failures);valid=valid and not progress_failures and not persona_failures
                 validation="pass" if valid else "failed:"+",".join(failures)
-                if not valid:text=progress_fallback(persona,message,history) if progress_failures else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
+                if not valid and (progress_failures or persona_failures):
+                    text,usage=self.conversation.generate(contract,message,history,"; ".join(progress_failures+persona_failures))
+                    valid,failures=self.validator.validate(text,{r.title for r in immediate+long_term},known_titles) if self.config.output_validation_enabled else (True,[])
+                    remaining=response_progress_failures(text,history,stage)+persona_quality_failures(text,persona,history,message,"SUPPORT")
+                    if remaining or not valid:text=progress_fallback(persona,message,history) if stage=="SUPPORT_ACTION" else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
+                    validation="pass:regenerated" if not remaining and valid else "fallback:"+",".join(remaining or failures)
+                elif not valid:text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
             except Exception as exc:
                 errors.append(f"generation:{type(exc).__name__}")
                 text=progress_fallback(persona,message,history) if stage=="SUPPORT_ACTION" else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))

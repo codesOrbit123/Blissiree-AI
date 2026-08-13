@@ -89,9 +89,11 @@ def response_progress_failures(text:str,history:list[dict],stage:str) -> list[st
 def progress_fallback(persona:str,message:str,history:list[dict]) -> str:
     all_user=" ".join(str(x.get("content","")) for x in history[-10:] if x.get("role")=="user")+" "+message
     if re.search(r"\b(cat|kitten|pet)\b",all_user,re.I) and re.search(r"\b(dead|died|sad|sadness|stuck|thought)\b",all_user,re.I):
-        return ("Your thoughts seem caught around losing your cat, and the memory of her white fur is close right now. We don’t have to force the sadness away. Let’s slow this moment down together: take one easy breath, then notice one comforting memory of her—no need to explain it perfectly."
+        accident=bool(re.search(r"\b(accident|cliff|crash|car)\b",all_user,re.I))
+        return (("That was a sudden and frightening loss, and the accident still seems close in your mind. We don’t have to force the memory away. Let’s slow this moment down gently and notice what you need most right now: space to remember your cat, or a brief pause from the accident memory."
+                 if accident else "The sadness of losing your cat is still close, and your thoughts seem caught around her. We don’t have to force that away. Let’s slow this moment down gently and notice one memory of her that feels comforting rather than painful.")
                 if persona=="emma" else
-                "Your thoughts are looping around losing your cat. Let’s reduce the pressure for a moment: put both feet on the floor, take one slow breath, and name three things you can see. Then decide whether remembering one good moment with her or briefly shifting your attention would feel more manageable.")
+                "Your thoughts are looping around losing your cat and the accident. First, reduce the pressure: place both feet on the floor and name three things you can see. Then choose whether to remember one good moment with her or briefly shift your attention.")
     return ("I’ve heard the details you’ve shared, so I won’t keep asking you to explain the same thing. Let’s pause for one slow breath and focus on the smallest part of this moment you can gently hold."
             if persona=="emma" else
             "We have enough context to stop analysing and take one practical step. Put both feet on the floor, breathe out slowly, and choose one thing you can handle in the next five minutes.")

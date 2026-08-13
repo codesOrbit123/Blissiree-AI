@@ -10,7 +10,8 @@ from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
 from blissiree.conversation_intent import ConversationIntent,classify_conversation_intent,contextual_fallback,conversation_stage
 from blissiree.product_info import is_product_information_request,product_information_response
 from blissiree.intent_router import BOOKING_URL,consultation_booking_response,route_top_level_intent
-from blissiree.conversation_state import conversation_brief,progress_fallback,response_progress_failures,support_progress_stage
+from blissiree.conversation_state import conversation_brief,fallback_context,information_quality_failures,progress_fallback,response_progress_failures,support_progress_stage
+from blissiree.schemas import ConversationContext
 
 class TriageTests(unittest.TestCase):
     def setUp(self): self.engine=TriageEngine()
@@ -233,6 +234,23 @@ class ConversationProgressTests(unittest.TestCase):
         emma=progress_fallback("emma","I am stuck in thoughts of her",self.history)
         ben=progress_fallback("ben","I am stuck in thoughts of her",self.history)
         self.assertIn("white fur",emma);self.assertIn("feet on the floor",ben);self.assertNotEqual(emma,ben)
+
+class ContextEngineTests(unittest.TestCase):
+    def test_natural_platform_language_routes_to_overview(self):
+        context=fallback_context("I am interested in knowing about platform",[])
+        self.assertEqual(context.intent,"PRODUCT_INFORMATION");self.assertEqual(context.active_topic,"BLISSIREE_OVERVIEW")
+    def test_program_followup_uses_prior_product_context(self):
+        history=[{"role":"user","content":"what blissiree is"},{"role":"assistant","content":"Blissiree is a platform"}]
+        context=fallback_context("what are the programs",history)
+        self.assertEqual(context.active_topic,"BLISSIREE_PROGRAMS")
+    def test_emotional_support_is_product_followup_in_reported_thread(self):
+        history=[{"role":"user","content":"what blissiree is"},{"role":"assistant","content":"Blissiree is a platform"},
+                 {"role":"user","content":"what are the programs"},{"role":"assistant","content":"Blissiree offers programs"}]
+        context=fallback_context("emotional support",history)
+        self.assertEqual(context.intent,"PRODUCT_INFORMATION");self.assertIn("offering",context.question_to_answer)
+    def test_indirect_curiosity_opening_fails_information_quality(self):
+        context=ConversationContext(intent="PRODUCT_INFORMATION",active_topic="BLISSIREE_OVERVIEW")
+        self.assertIn("indirect_information_opening",information_quality_failures("It sounds like you're curious about Blissiree.",context))
 
 class ConsultationBookingTests(unittest.TestCase):
     def test_direct_free_consultation_booking_is_routed(self):

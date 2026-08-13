@@ -3,11 +3,13 @@ import json
 from google import genai
 from google.genai import types
 from .config import AIConfig
-from .schemas import MentalStateAnalysis, ResponseContract
+from .schemas import ConversationContext,MentalStateAnalysis,ResponseContract
 
 class AnalysisLLMProvider(ABC):
     @abstractmethod
     def analyze(self, payload: dict) -> MentalStateAnalysis: ...
+    @abstractmethod
+    def contextualize(self,message:str,history:list[dict]) -> ConversationContext: ...
 
 class ConversationLLMProvider(ABC):
     @abstractmethod
@@ -39,7 +41,21 @@ Return separate boost and program relevance. JSON input:\n""" + str(payload)
                 thinking_config=types.ThinkingConfig(thinking_budget=0)))
         return MentalStateAnalysis.model_validate_json(response.text)
 
-    def generate(self, contract: ResponseContract, message: str, history: list[dict]) -> tuple[str, dict]:
+    def contextualize(self,message:str,history:list[dict]) -> ConversationContext:
+        prompt={"recent_history":history[-12:],"latest_user_message":message}
+        system="""Interpret the latest message in conversational context and return structured state only. Prefer the user's actual goal over literal keywords.
+Resolve short or elliptical follow-ups from prior turns. After discussing Blissiree programs, “emotional support” means the user wants the offering relevant
+to emotional support, not necessarily a new personal disclosure. PRODUCT_INFORMATION covers Blissiree, its platform, business, app, programs, Boosts and
+services. RESOURCE_GUIDANCE means the user seeks a suitable audio or program for their own situation. COMPANION_SUPPORT means they want discussion or
+emotional support. CONSULTATION_BOOKING requires clear booking intent. Set question_to_answer to the direct question the reply must answer.
+needs_clarification is true only when no useful answer is possible from approved knowledge. Track concrete known facts and what was already answered.
+Do not diagnose."""
+        response=self.client.models.generate_content(model=self.config.analysis_model,contents=json.dumps(prompt,ensure_ascii=False),
+            config=types.GenerateContentConfig(system_instruction=system,response_mime_type="application/json",response_schema=ConversationContext,
+                temperature=0,max_output_tokens=700,thinking_config=types.ThinkingConfig(thinking_budget=0)))
+        return ConversationContext.model_validate_json(response.text)
+
+    def generate(self, contract: ResponseContract, message: str, history: list[dict],correction:str|None=None) -> tuple[str, dict]:
         persona = contract.persona
         style = ("emotion and support: warm, compassionate, gentle, emotionally attentive, validating, and unhurried; "
                  "create emotional safety before offering a next step" if persona == "emma" else
@@ -70,6 +86,10 @@ resource in immediate_recommendations or long_term_recommendations. Never rush f
 When conversation_stage is SUPPORT_ACTION, stop interviewing: reflect the concrete situation and offer one small supportive action. A question is optional,
 not required. Never reuse a generic question from recent_history. Follow persona_requirements as mandatory behavioral constraints: Emma must feel emotionally
 present and gently relational; Ben must feel steady, structured and practical. Their replies to the same situation must not be interchangeable."""
+        system += """ When interaction_mode is INFORMATION, answer question_to_answer directly in the first sentence using only retrieved_knowledge.
+Do not begin with “It sounds like”, “you seem curious”, or an emotional reflection. Use recent context to resolve follow-ups. Do not turn a factual
+question into an interview. If useful, end with one concise choice; do not ask what the user wants to know when their question is already clear."""
+        if correction:system += "\nThe previous draft failed quality validation. Correct these issues without mentioning validation: "+correction
         prompt = {"response_contract": contract.model_dump(), "recent_history": history[-8:], "user_message": message}
         response = self.client.models.generate_content(
             model=self.config.conversation_model, contents=json.dumps(prompt,ensure_ascii=False),

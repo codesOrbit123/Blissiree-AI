@@ -1,10 +1,40 @@
 import re
 
+from .schemas import ConversationContext
+
 
 GENERIC_QUESTIONS=(
     "what feels most important right now","what part of this feels most important","tell me what part",
     "would you like to share more","what feels most present","what is on your mind",
 )
+
+PRODUCT_TOPICS={"BLISSIREE_OVERVIEW","BLISSIREE_PROGRAMS","EMOTIONAL_EMPOWERMENT","UNSTOPPABLE_YOU","BOOST_LIBRARY","CONSULTATIONS"}
+
+
+def fallback_context(message:str,history:list[dict]) -> ConversationContext:
+    """Conservative continuity when structured Gemini analysis is temporarily unavailable."""
+    text=message.lower();recent=" ".join(str(x.get("content","")) for x in history[-8:] if x.get("role")=="user").lower()
+    product_context=any(x in recent for x in ("blissiree","platform","program","boost","consultation"))
+    if "emotional empowerment" in text:return ConversationContext(intent="PRODUCT_INFORMATION",active_topic="EMOTIONAL_EMPOWERMENT",question_to_answer="What is the Emotional Empowerment Program?",conversation_stage="INFORMATION",confidence=.8)
+    if "unstoppable" in text:return ConversationContext(intent="PRODUCT_INFORMATION",active_topic="UNSTOPPABLE_YOU",question_to_answer="What is the Unstoppable You Program?",conversation_stage="INFORMATION",confidence=.8)
+    if re.search(r"\b(programs?|offerings?)\b",text) and (product_context or "blissiree" in text):return ConversationContext(intent="PRODUCT_INFORMATION",active_topic="BLISSIREE_PROGRAMS",question_to_answer="What programs does Blissiree offer?",conversation_stage="INFORMATION",confidence=.75)
+    if re.search(r"\b(platform|business|blissiree)\b",text) and re.search(r"\b(know|what|about|interested)\b",text):return ConversationContext(intent="PRODUCT_INFORMATION",active_topic="BLISSIREE_OVERVIEW",question_to_answer="What is Blissiree?",conversation_stage="INFORMATION",confidence=.75)
+    if product_context and re.search(r"\bemotional support\b",text):return ConversationContext(intent="PRODUCT_INFORMATION",active_topic="BLISSIREE_PROGRAMS",question_to_answer="Which Blissiree offering is relevant to emotional support?",is_follow_up=True,conversation_stage="INFORMATION",confidence=.7)
+    return ConversationContext(intent="COMPANION_SUPPORT",active_topic="USER_SITUATION",question_to_answer=message,conversation_stage=support_progress_stage(message,history),confidence=.4)
+
+
+def context_query(context:ConversationContext,message:str) -> str:
+    return " ".join(x for x in (context.active_topic.replace("_"," "),context.user_goal,context.question_to_answer,message) if x)
+
+
+def information_quality_failures(text:str,context:ConversationContext) -> list[str]:
+    if context.intent!="PRODUCT_INFORMATION":return []
+    failures=[];lower=text.lower()
+    if re.match(r"\s*(it sounds like|you seem|i hear (?:that )?you)",lower):failures.append("indirect_information_opening")
+    if not text.strip():failures.append("empty_answer")
+    if context.active_topic=="BLISSIREE_OVERVIEW" and "blissiree" not in lower:failures.append("missing_platform_answer")
+    if context.active_topic=="BLISSIREE_PROGRAMS" and not any(x in lower for x in ("emotional empowerment","unstoppable you","boost library")):failures.append("missing_program_answer")
+    return failures
 
 
 def conversation_brief(message:str,history:list[dict]) -> str:

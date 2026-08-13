@@ -1,6 +1,7 @@
 import re
 
 from .conversation_intent import SUPPORT_SIGNAL
+from .schemas import ConversationContext
 
 
 PRODUCT_QUERY = re.compile(
@@ -54,3 +55,20 @@ def product_information_response(message,history):
             "a 30-minute Brain Reset, the Emotional Empowerment Program, the Unstoppable You Program, and optional consultations with Terri. "
             "People can use it either to talk through how they are feeling or to explore relevant Blissiree resources. It is not a medical or healthcare service. "
             "What part would you like to explore?")
+
+
+def contextual_product_fallback(context:ConversationContext,message:str,history:list[dict]) -> str:
+    topic=context.active_topic
+    if topic=="EMOTIONAL_EMPOWERMENT":return product_information_response("Emotional Empowerment Program",history)
+    if topic=="UNSTOPPABLE_YOU":return product_information_response("Unstoppable You Program",history)
+    if topic=="BOOST_LIBRARY":return product_information_response("Boost Library",history)
+    if topic=="CONSULTATIONS":return product_information_response("consultations with Terri",history)
+    if topic=="BLISSIREE_PROGRAMS":
+        if "emotional support" in (context.question_to_answer+" "+message).lower():
+            return ("For emotional support, Blissiree offers two main pathways. The Boost Library provides optional audio support for immediate situations, "
+                    "while the Emotional Empowerment Program is a structured 14-session journey for longer-standing emotional patterns. "
+                    "Tell me whether you want something for right now or information about the structured program, and I can explain that option.")
+        return ("Blissiree offers the Emotional Empowerment Program for longer-standing emotional patterns and responses, and the Unstoppable You Program "
+                "for adult confidence, focus, resilience, direction and personal growth. The app also includes the Boost Library and 30-minute Brain Reset "
+                "for optional wellbeing support. Which program would you like explained?")
+    return product_information_response("What is Blissiree?",history)

@@ -22,6 +22,19 @@ class MentalStateAnalysis(BaseModel):
     boost_intent: bool = False
     program_intent: bool = False
 
+class ConversationContext(BaseModel):
+    intent: Literal["PRODUCT_INFORMATION","COMPANION_SUPPORT","RESOURCE_GUIDANCE","CONSULTATION_BOOKING","OUT_OF_SCOPE","FEEDBACK","REFUSAL"] = "COMPANION_SUPPORT"
+    active_topic: Literal["BLISSIREE_OVERVIEW","BLISSIREE_PROGRAMS","EMOTIONAL_EMPOWERMENT","UNSTOPPABLE_YOU","BOOST_LIBRARY","CONSULTATIONS","USER_SITUATION","OTHER"] = "USER_SITUATION"
+    user_goal: str = ""
+    question_to_answer: str = ""
+    is_follow_up: bool = False
+    needs_clarification: bool = False
+    known_facts: list[str] = []
+    reported_emotions: list[str] = []
+    already_answered: list[str] = []
+    conversation_stage: Literal["INFORMATION","DISCOVERY","EXPLORATION","SUPPORT_ACTION","RECOMMENDATION"] = "DISCOVERY"
+    confidence: float = Field(default=0.0,ge=0,le=1)
+
 class Recommendation(BaseModel):
     id: str
     title: str
@@ -46,8 +59,9 @@ class ResponseContract(BaseModel):
     clarification_question: str | None = None
     program_assessment_required: bool = False
     compiled_instructions: list[dict] = []
-    interaction_mode: Literal["SUPPORT", "CASUAL", "OUT_OF_SCOPE", "REFUSAL", "FEEDBACK"] = "SUPPORT"
+    interaction_mode: Literal["SUPPORT", "INFORMATION", "CASUAL", "OUT_OF_SCOPE", "REFUSAL", "FEEDBACK"] = "SUPPORT"
     response_guidance: str | None = None
-    conversation_stage: Literal["DISCOVERY", "EXPLORATION", "SUPPORT_ACTION", "RECOMMENDATION"] = "DISCOVERY"
+    conversation_stage: Literal["INFORMATION", "DISCOVERY", "EXPLORATION", "SUPPORT_ACTION", "RECOMMENDATION"] = "DISCOVERY"
     conversation_brief: str | None = None
     persona_requirements: list[str] = []
+    question_to_answer: str | None = None

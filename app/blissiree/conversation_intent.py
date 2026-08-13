@@ -106,12 +106,16 @@ def contextual_fallback(persona: str, message: str, intent: ConversationIntent, 
         )
     if re.search(r"\b(lost|loss)\b.{0,80}\b(\$|money|dollars?|btc|bitcoin|crypto|savings?|financial)",message,re.I) or re.search(
         r"\b(\$|money|dollars?|btc|bitcoin|crypto|savings?|financial)\b.{0,80}\b(lost|loss)\b",message,re.I
-    ):
+        ):
         return (
             "Losing that much sounds deeply upsetting and destabilising. What feels most urgent right now—the shock of it, worry about what happens next, or simply getting through this moment?"
             if persona == "emma"
             else "That is a serious financial loss, and the immediate emotional impact can be intense. What needs attention first—the shock, your next practical step, or getting steadier right now?"
         )
+    if re.search(r"\b(confidence|confidenc3|confidance|self[- ]?belief|self[- ]?esteem)\b",message,re.I):
+        return ("You’re saying your confidence feels low. I won’t turn that into a different emotion. Is this showing up in one situation, or more generally at the moment?"
+                if persona=="emma" else
+                "Your confidence feels low. Let’s keep the focus there: is one situation affecting it, or has it been broader lately?")
     if has_context:
         if re.search(r"\b(sad|sadness|low|crying)\b",message,re.I):
             return ("You’re feeling sad today, and we can stay with that gently. What happened today, or what has been coming back to mind?"

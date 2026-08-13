@@ -117,7 +117,9 @@ class BlissireeOrchestrator:
         elif context.intent=="FEEDBACK" and not correction:conversation_intent=type(conversation_intent)("FEEDBACK","Accept the feedback and adjust directly.")
         elif context.intent=="REFUSAL":conversation_intent=type(conversation_intent)("REFUSAL","Respect the request for space and end without a question.")
         stage="RECOMMENDATION" if context.intent=="RESOURCE_GUIDANCE" and not context.needs_clarification else conversation_stage(message,history)
-        if stage != "RECOMMENDATION":stage=context.conversation_stage if context.conversation_stage in {"DISCOVERY","EXPLORATION","SUPPORT_ACTION"} else support_progress_stage(message,history)
+        if stage != "RECOMMENDATION":
+            deterministic_stage=support_progress_stage(message,history)
+            stage="SUPPORT_ACTION" if deterministic_stage=="SUPPORT_ACTION" else context.conversation_stage if context.conversation_stage in {"DISCOVERY","EXPLORATION","SUPPORT_ACTION"} else deterministic_stage
         t=time.perf_counter(); query=context_query(context,message);docs=self.repo.retrieve(query) if self.config.rag_enabled else []
         if self.config.rag_enabled and self.training_store:docs.extend(self.training_store.retrieve_knowledge(query,target=persona.upper()))
         retrieval_ms=round((time.perf_counter()-t)*1000)

@@ -282,6 +282,11 @@ class ContextEngineTests(unittest.TestCase):
         result=resolve_conversation_reference(ConversationContext(intent="OUT_OF_SCOPE"),"please share",[])
         self.assertEqual(result.intent,"RESOURCE_GUIDANCE")
         self.assertTrue(result.needs_clarification)
+    def test_typo_tolerant_direct_blissiree_content_request(self):
+        result=apply_latest_message_authority(ConversationContext(),"too mch work today anything blissire can offer",[])
+        self.assertEqual(result.intent,"RESOURCE_GUIDANCE")
+        self.assertEqual(result.resolved_reference,"work stress content")
+        self.assertFalse(result.needs_clarification)
 
 class CapabilityRouterTests(unittest.TestCase):
     def route(self,intent,history=None,**kwargs):

@@ -110,6 +110,25 @@ question into an interview. If useful, end with one concise choice; do not ask w
         usage = response.usage_metadata.model_dump() if response.usage_metadata else {}
         return response.text or "", usage
 
+    def rewrite_response(self, draft: str, brief: dict) -> tuple[str, dict]:
+        persona = brief["persona"]
+        identity = ("warm, gentle, emotionally present, compassionate, trauma-aware and unhurried" if persona == "emma" else
+                    "calm, grounded, steady, clear, practical and encouraging")
+        system = f"""You are the final Blissiree response editor. Your sole task is to rewrite another agent's draft before it reaches the user.
+Do not approve, reject, score, explain, or mention the draft. Return only the rewritten user-facing message.
+The final voice is {persona.title()}: {identity}. Apply the supplied editorial requirements as mandatory standards.
+Build real conversational correlation: respond to the latest user's specific words and connect to relevant recent context. Do not merely insert a
+topic keyword into generic empathy. Preserve every approved fact, exact Blissiree title, URL, boundary, safety instruction and recommendation in the
+draft. Never create a new fact, diagnosis, emotional claim, product, recommendation, promise or clinical implication. Blissiree is wellbeing and
+personal-development support, not medical care. Keep the response natural, concise, adult-to-adult, and usually under 130 words."""
+        payload={"draft_to_rewrite":draft,**brief}
+        response=self.client.models.generate_content(
+            model=self.config.conversation_model,contents=json.dumps(payload,ensure_ascii=False),
+            config=types.GenerateContentConfig(system_instruction=system,temperature=0.15,max_output_tokens=400,
+                                               thinking_config=types.ThinkingConfig(thinking_budget=0)))
+        usage=response.usage_metadata.model_dump() if response.usage_metadata else {}
+        return (response.text or draft).strip(),usage
+
     def embed(self, texts: list[str]) -> list[list[float]]:
         result = self.client.models.embed_content(model=self.config.embedding_model, contents=texts)
         return [item.values for item in result.embeddings]

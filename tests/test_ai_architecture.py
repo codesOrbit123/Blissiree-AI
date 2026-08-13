@@ -312,16 +312,15 @@ class CapabilityRouterTests(unittest.TestCase):
 
 class ResponseReviewAgentTests(unittest.TestCase):
     def setUp(self):self.reviewer=ResponseReviewAgent()
-    def test_rejects_generic_reply_to_work_overload(self):
-        result=self.reviewer.review("I’ve heard the details you’ve shared. Let’s pause for one breath.","i had a work overload",[],"SUPPORT")
-        self.assertFalse(result.passed);self.assertIn("missing_latest_message_correlation",result.failures)
-    def test_accepts_specific_emma_correlation(self):
-        text="Having that much work land on you can leave you feeling stretched. What part of the workload is weighing on you most?"
-        self.assertTrue(self.reviewer.review(text,"i had a work overload",[],"SUPPORT").passed)
-    def test_discussion_switch_stops_audio_push(self):
-        result=self.reviewer.review("Try the Stress Collection.","done with audios, I want to discuss my problem",[],"SUPPORT")
-        self.assertIn("ignored_discussion_preference",result.failures)
-        self.assertIn("leave the audios",self.reviewer.fallback("emma","done with audios, I want to discuss my problem",[]))
+    def test_brief_requires_rewrite_not_rejection(self):
+        brief=self.reviewer.brief("emma","i had a work overload",[],"SUPPORT")
+        self.assertIn("Rewrite the draft; do not grade, reject, or discuss it.",brief["editorial_requirements"])
+        self.assertEqual(brief["latest_user_message"],"i had a work overload")
+    def test_brief_includes_recent_context_for_correlation(self):
+        history=[{"role":"user","content":"I have too many deadlines"},{"role":"assistant","content":"Tell me more"}]
+        brief=self.reviewer.brief("ben","my manager added more work",history,"SUPPORT")
+        self.assertEqual(brief["recent_conversation"],history)
+        self.assertEqual(brief["persona"],"ben")
     def test_natural_platform_language_routes_to_overview(self):
         context=fallback_context("I am interested in knowing about platform",[])
         self.assertEqual(context.intent,"PRODUCT_INFORMATION");self.assertEqual(context.active_topic,"BLISSIREE_OVERVIEW")

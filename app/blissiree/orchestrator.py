@@ -33,12 +33,24 @@ class BlissireeOrchestrator:
         self.config=config; self.analysis:AnalysisLLMProvider=provider; self.conversation:ConversationLLMProvider=provider; self.repo=repository;self.training_store=training_store
         self.triage=TriageEngine(); self.horizon=SupportHorizonClassifier(); self.immediate=ImmediateSupportEngine(); self.long_term=LongTermJourneyEngine(); self.validator=OutputSafetyValidator();self.reviewer=ResponseReviewAgent()
 
+    def _rewrite(self,text:str,persona:str,message:str,history:list[dict],mode:str,errors:list[str]) -> str:
+        """Every user-facing draft passes through the persona/correlation editor."""
+        try:
+            rewrite=getattr(self.conversation,"rewrite_response",None)
+            if rewrite:
+                rewritten,_=rewrite(text,self.reviewer.brief(persona,message,history,mode))
+                return rewritten or text
+        except Exception as exc:
+            errors.append(f"response_rewrite:{type(exc).__name__}")
+        return text
+
     def respond(self, message: str, persona: str, history: list[dict], conversation_id: str | None = None) -> dict:
         request_id=str(uuid.uuid4()); started=time.perf_counter(); errors=[]
         terminal_kind=terminal_turn_kind(message,self.triage)
         if terminal_kind:
             route=route_capability(ConversationContext(),history,terminal=True)
             text=terminal_turn_response(persona,terminal_kind)
+            text=self._rewrite(text,persona,message,history,"TERMINAL",errors)
             event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
                 "conversation_model":self.config.conversation_model,"triage_level":"T7","retrieved_content_ids":[],"recommended_boost_ids":[],
                 "recommended_program_id":None,"support_horizon":"UNCLEAR","boost_relevance_score":"VERY_LOW","program_relevance_score":"VERY_LOW",
@@ -59,6 +71,7 @@ class BlissireeOrchestrator:
         if (context.intent=="CONSULTATION_BOOKING" or routed_intent.kind == "CONSULTATION_BOOKING") and not booking_safety.blocks_recommendations:
             route=route_capability(context.model_copy(update={"intent":"CONSULTATION_BOOKING"}),history)
             text=consultation_booking_response(routed_intent.service,persona)
+            text=self._rewrite(text,persona,message,history,"BOOKING",errors)
             event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
                 "conversation_model":self.config.conversation_model,"triage_level":"T7","retrieved_content_ids":["official-site:consultations"],
                 "recommended_boost_ids":[],"recommended_program_id":None,"support_horizon":"UNCLEAR","boost_relevance_score":"VERY_LOW",
@@ -81,13 +94,14 @@ class BlissireeOrchestrator:
             product_titles={"Emotional Empowerment Program","Unstoppable You Program"}
             try:
                 text,usage=self.conversation.generate(contract,message,history)
-                failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)+persona_quality_failures(text,persona,history,message,"INFORMATION")+self.reviewer.review(text,message,history,"INFORMATION").failures
+                failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)+persona_quality_failures(text,persona,history,message,"INFORMATION")
                 if failures:
                     text,usage=self.conversation.generate(contract,message,history,"; ".join(failures))
-                    failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)+persona_quality_failures(text,persona,history,message,"INFORMATION")+self.reviewer.review(text,message,history,"INFORMATION").failures
+                    failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)+persona_quality_failures(text,persona,history,message,"INFORMATION")
                 if failures:text=contextual_product_fallback(context,message,history)
             except Exception as exc:
                 errors.append(f"information_generation:{type(exc).__name__}");text=contextual_product_fallback(context,message,history)
+            text=self._rewrite(text,persona,message,history,"INFORMATION",errors)
             generation_ms=round((time.perf_counter()-t)*1000)
             event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
                 "conversation_model":self.config.conversation_model,"triage_level":"T7","retrieved_content_ids":[d["id"] for d in docs],
@@ -161,20 +175,20 @@ class BlissireeOrchestrator:
                 progress_failures=response_progress_failures(text,history,stage)
                 progress_failures+=recommendation_fulfilment_failures(text,[r.title for r in immediate+long_term],stage)
                 persona_failures=persona_quality_failures(text,persona,history,message,"SUPPORT")
-                review_failures=self.reviewer.review(text,message,history,"SUPPORT").failures
-                failures.extend(progress_failures+persona_failures+review_failures);valid=valid and not progress_failures and not persona_failures and not review_failures
+                failures.extend(progress_failures+persona_failures);valid=valid and not progress_failures and not persona_failures
                 validation="pass" if valid else "failed:"+",".join(failures)
-                if not valid and (progress_failures or persona_failures or review_failures):
-                    text,usage=self.conversation.generate(contract,message,history,"; ".join(progress_failures+persona_failures+review_failures))
+                if not valid and (progress_failures or persona_failures):
+                    text,usage=self.conversation.generate(contract,message,history,"; ".join(progress_failures+persona_failures))
                     valid,failures=self.validator.validate(text,{r.title for r in immediate+long_term},known_titles) if self.config.output_validation_enabled else (True,[])
-                    remaining=response_progress_failures(text,history,stage)+recommendation_fulfilment_failures(text,[r.title for r in immediate+long_term],stage)+persona_quality_failures(text,persona,history,message,"SUPPORT")+self.reviewer.review(text,message,history,"SUPPORT").failures
+                    remaining=response_progress_failures(text,history,stage)+recommendation_fulfilment_failures(text,[r.title for r in immediate+long_term],stage)+persona_quality_failures(text,persona,history,message,"SUPPORT")
                     if remaining or not valid:
-                        text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user)) if immediate else self.reviewer.fallback(persona,message,history)
+                        text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
                     validation="pass:regenerated" if not remaining and valid else "fallback:"+",".join(remaining or failures)
-                elif not valid:text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user)) if immediate else self.reviewer.fallback(persona,message,history)
+                elif not valid:text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
             except Exception as exc:
                 errors.append(f"generation:{type(exc).__name__}")
-                text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user)) if immediate else self.reviewer.fallback(persona,message,history)
+                text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
+        text=self._rewrite(text,persona,message,history,"SAFETY" if triage.blocks_recommendations else "SUPPORT",errors)
         generation_ms=round((time.perf_counter()-t)*1000)
         event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
             "conversation_model":self.config.conversation_model,"triage_level":triage.level,"retrieved_content_ids":[d["id"] for d in docs],

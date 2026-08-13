@@ -21,7 +21,11 @@ def conversation_brief(message:str,history:list[dict]) -> str:
 
 
 def support_progress_stage(message:str,history:list[dict]) -> str:
-    user_turns=[x for x in history[-10:] if x.get("role")=="user"]
+    recent=history[-10:]
+    last_product=-1
+    for i,item in enumerate(recent):
+        if item.get("role")=="user" and re.search(r"\b(blissiree|emotional empowerment|unstoppable you|boost library|brain reset|consultation)\b",str(item.get("content","")),re.I):last_product=i
+    user_turns=[x for x in recent[last_product+1:] if x.get("role")=="user"]
     if len(user_turns)>=3 and not re.search(r"\b(what|why|when|where|who|how)\b",message,re.I):return "SUPPORT_ACTION"
     return "EXPLORATION" if user_turns else "DISCOVERY"
 

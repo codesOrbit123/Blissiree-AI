@@ -120,7 +120,8 @@ class BlissireeOrchestrator:
                 validation="pass" if valid else "failed:"+",".join(failures)
                 if not valid:text=progress_fallback(persona,message,history) if progress_failures else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
             except Exception as exc:
-                errors.append(f"generation:{type(exc).__name__}"); text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
+                errors.append(f"generation:{type(exc).__name__}")
+                text=progress_fallback(persona,message,history) if stage=="SUPPORT_ACTION" else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
         generation_ms=round((time.perf_counter()-t)*1000)
         event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
             "conversation_model":self.config.conversation_model,"triage_level":triage.level,"retrieved_content_ids":[d["id"] for d in docs],

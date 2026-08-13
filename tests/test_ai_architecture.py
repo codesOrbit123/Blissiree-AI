@@ -219,6 +219,10 @@ class ConversationProgressTests(unittest.TestCase):
         self.assertIn("colour white",brief);self.assertIn("sadness",brief);self.assertIn("stuck",brief)
     def test_longer_conversation_moves_to_support_action(self):
         self.assertEqual(support_progress_stage("my brain is stuck",self.history),"SUPPORT_ACTION")
+    def test_product_turns_do_not_count_as_emotional_discovery(self):
+        history=[{"role":"user","content":"What is Blissiree?"},{"role":"assistant","content":"A wellbeing platform"},
+                 {"role":"user","content":"What is Emotional Empowerment?"},{"role":"assistant","content":"A 14-session program"}]
+        self.assertEqual(support_progress_stage("ok i am sad",history),"DISCOVERY")
     def test_generic_question_is_blocked_after_context(self):
         failures=response_progress_failures("What feels most important right now?",self.history,"SUPPORT_ACTION")
         self.assertIn("generic_question_after_context",failures)

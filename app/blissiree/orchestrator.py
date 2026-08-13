@@ -11,7 +11,7 @@ from .schemas import ConversationContext,MentalStateAnalysis,ResponseContract,Us
 from .conversation_intent import classify_conversation_intent, contextual_fallback, conversation_stage, stage_guidance
 from .product_info import contextual_product_fallback
 from .intent_router import route_top_level_intent,consultation_booking_response
-from .conversation_state import apply_latest_message_authority,context_query,conversation_brief,fallback_context,information_quality_failures,progress_fallback,recommendation_fulfilment_failures,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
+from .conversation_state import accepted_recent_recommendation,apply_latest_message_authority,context_query,conversation_brief,fallback_context,information_quality_failures,progress_fallback,recommendation_acceptance_response,recommendation_fulfilment_failures,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
 from .persona import persona_quality_failures,persona_requirements
 from .capability_router import public_agent,route_capability
 from .response_reviewer import ResponseReviewAgent
@@ -70,6 +70,19 @@ class BlissireeOrchestrator:
                 "latency_analysis_ms":0,"latency_retrieval_ms":0,"latency_generation_ms":round((time.perf_counter()-started)*1000),
                 "latency_total_ms":round((time.perf_counter()-started)*1000),"token_usage":{},"model_errors":errors,
                 "output_validation_result":"pass:casual"}
+            log.info(json.dumps(event,separators=(",",":")))
+            return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":[],"active_agent":public_agent(route)}
+        if accepted_recent_recommendation(message,history):
+            context=ConversationContext(intent="RESOURCE_GUIDANCE",conversation_stage="RECOMMENDATION",confidence=1)
+            route=route_capability(context,history)
+            text=recommendation_acceptance_response(persona,message)
+            text=self._rewrite(text,persona,message,history,"RECOMMENDATION_ACCEPTANCE",errors)
+            event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
+                "conversation_model":self.config.conversation_model,"triage_level":"T7","retrieved_content_ids":[],"recommended_boost_ids":[],
+                "recommended_program_id":None,"support_horizon":"IMMEDIATE","boost_relevance_score":"VERY_LOW","program_relevance_score":"VERY_LOW",
+                "latency_analysis_ms":0,"latency_retrieval_ms":0,"latency_generation_ms":round((time.perf_counter()-started)*1000),
+                "latency_total_ms":round((time.perf_counter()-started)*1000),"token_usage":{},"model_errors":errors,
+                "output_validation_result":"pass:recommendation_acceptance"}
             log.info(json.dumps(event,separators=(",",":")))
             return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":[],"active_agent":public_agent(route)}
         context_started=time.perf_counter()

@@ -10,7 +10,7 @@ from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
 from blissiree.conversation_intent import ConversationIntent,classify_conversation_intent,contextual_fallback,conversation_stage
 from blissiree.product_info import is_product_information_request,product_information_response
 from blissiree.intent_router import BOOKING_URL,consultation_booking_response,route_top_level_intent
-from blissiree.conversation_state import apply_latest_message_authority,conversation_brief,fallback_context,information_quality_failures,progress_fallback,recommendation_fulfilment_failures,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
+from blissiree.conversation_state import accepted_recent_recommendation,apply_latest_message_authority,conversation_brief,fallback_context,information_quality_failures,progress_fallback,recommendation_acceptance_response,recommendation_fulfilment_failures,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
 from blissiree.schemas import ConversationContext
 from blissiree.persona import persona_quality_failures,persona_requirements
 from blissiree.capability_router import public_agent,route_capability
@@ -318,6 +318,17 @@ class CapabilityRouterTests(unittest.TestCase):
         failures=recommendation_fulfilment_failures("I can share some options.",["Stress and Tension Management Collection"],"RECOMMENDATION")
         self.assertIn("missing_eligible_recommendation_title",failures)
         self.assertEqual(recommendation_fulfilment_failures("Try the Stress and Tension Management Collection.",["Stress and Tension Management Collection"],"RECOMMENDATION"),[])
+
+    def test_checking_it_accepts_recent_audio_recommendation(self):
+        history=[{"role":"assistant","content":"The Anxious Thoughts Support Collection might be a gentle place to start."}]
+        self.assertTrue(accepted_recent_recommendation("yeah sure checking it",history))
+        reply=recommendation_acceptance_response("emma","yeah sure checking it")
+        self.assertIn("checking it out",reply)
+        self.assertNotIn("?",reply)
+
+    def test_checking_it_without_recommendation_is_not_assumed(self):
+        history=[{"role":"assistant","content":"Tell me what happened."}]
+        self.assertFalse(accepted_recent_recommendation("checking it",history))
 
 class ResponseReviewAgentTests(unittest.TestCase):
     def setUp(self):self.reviewer=ResponseReviewAgent()

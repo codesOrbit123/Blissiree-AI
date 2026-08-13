@@ -12,6 +12,29 @@ PRODUCT_TOPICS={"BLISSIREE_OVERVIEW","BLISSIREE_PROGRAMS","EMOTIONAL_EMPOWERMENT
 SHORT_REFERENCE=re.compile(r"^\s*(yes|yes please|please|please share|share it|show me|which one|tell me more|what about that|play it|give me one|which audio|what program|okay do that|the first one)\s*[?!.]*\s*$",re.I)
 CONFIDENCE_TYPO=re.compile(r"\b(confidence|confidenc3|confidance|self[- ]?belief|self[- ]?esteem)\b",re.I)
 SADNESS_EXPLICIT=re.compile(r"\b(sad|sadness|crying|unhappy|feeling low)\b",re.I)
+RECOMMENDATION_ACCEPTANCE=re.compile(
+    r"^\s*(?:(?:yeah|yes|yep|sure|okay|ok|alright)[,!. ]*)*"
+    r"(?:i(?:'m| am)?\s*)?(?:checking(?: it| this| them)?(?: out)?|looking(?: at| into) (?:it|this|them)|"
+    r"listening(?: to it)?(?: now)?|trying it(?: now)?|i(?:'ll| will) (?:check|try|listen)|"
+    r"will (?:check|try|listen)|sounds good|okay|ok|sure)\s*[!.]*\s*$",re.I)
+
+
+def accepted_recent_recommendation(message:str,history:list[dict]) -> bool:
+    """Recognise a brief acceptance only when it follows an actual resource recommendation."""
+    if not RECOMMENDATION_ACCEPTANCE.fullmatch(message):return False
+    assistants=[x for x in history[-3:] if x.get("role")=="assistant"]
+    if not assistants:return False
+    latest=str(assistants[-1].get("content",""))
+    return bool(re.search(r"\b(audio|boost|collection|program)\b",latest,re.I))
+
+
+def recommendation_acceptance_response(persona:str,message:str) -> str:
+    active=bool(re.search(r"\b(checking|looking|listening|trying)\b",message,re.I))
+    if persona=="emma":
+        return ("Of course—take your time checking it out. I hope it feels supportive for what you need right now."
+                if active else "Of course. Take your time with it, and I hope it feels supportive for what you need right now.")
+    return ("Good—take your time checking it out and see whether it feels useful for what you need right now."
+            if active else "Good. Take your time with it and see whether it feels useful for what you need right now.")
 
 
 def fallback_context(message:str,history:list[dict]) -> ConversationContext:

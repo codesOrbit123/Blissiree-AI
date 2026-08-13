@@ -8,6 +8,7 @@ from blissiree.safety import OutputSafetyValidator,TriageEngine,deterministic_cr
 from blissiree.recommendations import SupportHorizonClassifier,ImmediateSupportEngine
 from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
 from blissiree.conversation_intent import ConversationIntent,classify_conversation_intent,contextual_fallback,conversation_stage
+from blissiree.product_info import is_product_information_request,product_information_response
 
 class TriageTests(unittest.TestCase):
     def setUp(self): self.engine=TriageEngine()
@@ -175,6 +176,19 @@ class TerriWorkbookTrainingTests(unittest.TestCase):
         repo=KnowledgeRepository(Path(__file__).parents[1]/"knowledge")
         rows=repo.retrieve("I feel emotionally exhausted and drained all the time")
         self.assertTrue(any(d["id"]=="terri-workbook:EX-004A" for d in rows))
+
+class ProductInformationTests(unittest.TestCase):
+    def test_program_question_is_product_information(self):
+        self.assertTrue(is_product_information_request("What programs does Blissiree offer?",[]))
+    def test_contextual_yes_retains_product_topic(self):
+        history=[{"role":"user","content":"what programs blissiree has to offer"},{"role":"assistant","content":"I can share details."}]
+        self.assertTrue(is_product_information_request("yes please share details",history))
+    def test_program_overview_uses_exact_offerings(self):
+        text=product_information_response("What programs does Blissiree offer?",[])
+        self.assertIn("Emotional Empowerment Program",text);self.assertIn("Unstoppable You Program",text)
+    def test_official_site_knowledge_is_loaded(self):
+        repo=KnowledgeRepository(Path(__file__).parents[1]/"knowledge")
+        self.assertTrue(any(d["source"]=="BLISSIREE_OFFICIAL_WEBSITE" for d in repo.documents))
 
 
 class TrainingKnowledgeTests(unittest.TestCase):

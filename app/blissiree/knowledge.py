@@ -49,6 +49,14 @@ class KnowledgeRepository:
                     exemplar.get("recommendation_boundary",""),exemplar.get("medical_boundary","")]
                 self.documents.append({"id":f"terri-workbook:{record.get('id')}","source":"TERRI_WORKBOOK",
                                        "authority":95,"text":"\n".join(x for x in parts if x)})
+        site_knowledge=root / "sources" / "blissiree_official_site.json"
+        if site_knowledge.exists():
+            data=json.loads(site_knowledge.read_text())
+            self.documents.append({"id":"official-site:overview","source":"BLISSIREE_OFFICIAL_WEBSITE","authority":95,
+                                   "text":data["app_overview"]+" "+data["non_medical_boundary"]})
+            for offering in data["offerings"]:
+                self.documents.append({"id":"official-site:"+offering["name"].lower().replace(" ","-"),"source":"BLISSIREE_OFFICIAL_WEBSITE",
+                                       "authority":95,"text":offering["name"]+": "+offering["details"]+" Source: "+offering["source_url"]})
 
     def retrieve(self, query: str, limit: int = 10) -> list[dict]:
         terms = set(re.findall(r"[a-z]{4,}", query.lower()))

@@ -15,12 +15,14 @@ from blissiree.knowledge import KnowledgeRepository
 from blissiree.orchestrator import BlissireeOrchestrator
 from blissiree.providers import GeminiProvider
 from blissiree.training_store import TrainingStore
+from blissiree.issue_store import ConversationIssueStore
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL","INFO"),format="%(message)s")
 ROOT=Path(__file__).parent
 provider=GeminiProvider(settings)
 repository=KnowledgeRepository(ROOT/"knowledge")
 training_store=TrainingStore(repository)
+issue_store=ConversationIssueStore()
 orchestrator=BlissireeOrchestrator(settings,provider,repository,training_store)
 app=FastAPI()
 app.mount("/assets",StaticFiles(directory=ROOT/"assets"),name="assets")
@@ -59,6 +61,9 @@ class ChatRequest(BaseModel):
 
 class TrainingPayload(BaseModel):
     id:str|None=None;title:str;instruction:str;target:str="ALL";category:str="OTHER";priority:str="NORMAL";status:str="DRAFT";source:str="TERRI";kind:str="INSTRUCTION";affected_components:list[str]=[];related_tests:list[str]=[];why_it_exists:str=""
+
+class IssuePayload(BaseModel):
+    persona:str;conversation_id:str;description:str=Field(min_length=3,max_length=2000);thread:list[dict]=Field(min_length=1,max_length=200)
 
 def admin():
     return "Terri/Admin"
@@ -130,6 +135,15 @@ def effective_training(target:str):
 @app.get("/api/training/history")
 def training_history():
     admin();return {"versions":list(reversed(training_store.load()["versions"]))}
+
+@app.post("/api/conversation-issues")
+def report_conversation_issue(payload:IssuePayload):
+    persona=payload.persona if payload.persona in {"emma","ben"} else "emma"
+    safe_thread=[{"role":str(x.get("role",""))[:20],"content":str(x.get("content",""))[:4000]} for x in payload.thread]
+    return issue_store.create(persona,payload.conversation_id,safe_thread,payload.description,admin())
+
+@app.get("/api/conversation-issues")
+def conversation_issues():return {"items":issue_store.list()}
 
 @app.post("/api/training/build")
 def build_training():

@@ -9,6 +9,7 @@ from .recommendations import ImmediateSupportEngine, LongTermJourneyEngine, Supp
 from .safety import OutputSafetyValidator, TriageEngine, deterministic_crisis_response, terminal_turn_kind, terminal_turn_response
 from .schemas import MentalStateAnalysis, ResponseContract, UserState
 from .conversation_intent import classify_conversation_intent, contextual_fallback, conversation_stage, stage_guidance
+from .product_info import is_product_information_request,product_information_response
 
 log = logging.getLogger("blissiree.ai")
 
@@ -40,6 +41,16 @@ class BlissireeOrchestrator:
                 "output_validation_result":"pass:terminal_"+terminal_kind}
             log.info(json.dumps(event,separators=(",",":")))
             return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":[]}
+        if is_product_information_request(message,history):
+            text=product_information_response(message,history)
+            event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
+                "conversation_model":self.config.conversation_model,"triage_level":"T7","retrieved_content_ids":["official-site:overview"],
+                "recommended_boost_ids":[],"recommended_program_id":None,"support_horizon":"UNCLEAR","boost_relevance_score":"VERY_LOW",
+                "program_relevance_score":"VERY_LOW","latency_analysis_ms":0,"latency_retrieval_ms":0,"latency_generation_ms":0,
+                "latency_total_ms":round((time.perf_counter()-started)*1000),"token_usage":{},"model_errors":[],
+                "output_validation_result":"pass:product_information","conversation_stage":"INFORMATION"}
+            log.info(json.dumps(event,separators=(",",":")))
+            return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":["BLISSIREE_OFFICIAL_WEBSITE"]}
         recent_user=[str(x.get("content","")) for x in history[-8:] if x.get("role")=="user"]
         safety_context="\n".join(recent_user[-3:]+[message])
         t=time.perf_counter()

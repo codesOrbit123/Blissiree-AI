@@ -1,0 +1,12 @@
+{
+  "source": "BLISSIREE_OFFICIAL_WEBSITE",
+  "reviewed_at": "2026-08-13",
+  "non_medical_boundary": "Blissiree supports emotional wellbeing and personal development. It does not diagnose, treat, cure, or prevent medical conditions, and individual results vary.",
+  "app_overview": "Blissiree offers a 30-minute Brain Reset, a Boost Library with more than 200 sleep-based brain-retraining audios and curated playlists, plus structured personal-development programs.",
+  "offerings": [
+    {"name":"Boost Library","type":"audio_library","details":"More than 200 brain-retraining audios and curated playlists for areas such as stress, anxious thinking, sleep and emotional balance. Audio is designed for low or whisper-volume use while resting or sleeping.","source_url":"https://blissiree.com/inside"},
+    {"name":"Emotional Empowerment Program","type":"program","details":"A structured 14-session personal-development journey for people aged 13 and above, focused on longer-standing emotional patterns, beliefs, fears, perceptions and emotional responses.","source_url":"https://blissiree.com/inside"},
+    {"name":"Unstoppable You Program","type":"program","details":"An adult program for people aged 18 and above, focused on performance, focus, resilience, confidence, direction and personal growth.","source_url":"https://blissiree.com/inside"},
+    {"name":"Consultations with Terri","type":"consultation","details":"The official site describes a free 25-minute discovery call, an introductory session and a personalised 14-session journey. Availability and current commercial details should be confirmed on the consultation page.","source_url":"https://blissiree.com/consultations"}
+  ]
+}

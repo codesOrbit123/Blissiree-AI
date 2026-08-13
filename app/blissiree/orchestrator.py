@@ -14,6 +14,7 @@ from .intent_router import route_top_level_intent,consultation_booking_response
 from .conversation_state import apply_latest_message_authority,context_query,conversation_brief,fallback_context,information_quality_failures,progress_fallback,recommendation_fulfilment_failures,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
 from .persona import persona_quality_failures,persona_requirements
 from .capability_router import public_agent,route_capability
+from .response_reviewer import ResponseReviewAgent
 
 log = logging.getLogger("blissiree.ai")
 
@@ -30,7 +31,7 @@ def contract_fallback(persona:str,message:str,immediate:list,clarification:str|N
 class BlissireeOrchestrator:
     def __init__(self, config: AIConfig, provider, repository: KnowledgeRepository,training_store=None):
         self.config=config; self.analysis:AnalysisLLMProvider=provider; self.conversation:ConversationLLMProvider=provider; self.repo=repository;self.training_store=training_store
-        self.triage=TriageEngine(); self.horizon=SupportHorizonClassifier(); self.immediate=ImmediateSupportEngine(); self.long_term=LongTermJourneyEngine(); self.validator=OutputSafetyValidator()
+        self.triage=TriageEngine(); self.horizon=SupportHorizonClassifier(); self.immediate=ImmediateSupportEngine(); self.long_term=LongTermJourneyEngine(); self.validator=OutputSafetyValidator();self.reviewer=ResponseReviewAgent()
 
     def respond(self, message: str, persona: str, history: list[dict], conversation_id: str | None = None) -> dict:
         request_id=str(uuid.uuid4()); started=time.perf_counter(); errors=[]
@@ -80,10 +81,10 @@ class BlissireeOrchestrator:
             product_titles={"Emotional Empowerment Program","Unstoppable You Program"}
             try:
                 text,usage=self.conversation.generate(contract,message,history)
-                failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)+persona_quality_failures(text,persona,history,message,"INFORMATION")
+                failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)+persona_quality_failures(text,persona,history,message,"INFORMATION")+self.reviewer.review(text,message,history,"INFORMATION").failures
                 if failures:
                     text,usage=self.conversation.generate(contract,message,history,"; ".join(failures))
-                    failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)+persona_quality_failures(text,persona,history,message,"INFORMATION")
+                    failures=self.validator.validate(text,product_titles,product_titles)[1]+information_quality_failures(text,context)+persona_quality_failures(text,persona,history,message,"INFORMATION")+self.reviewer.review(text,message,history,"INFORMATION").failures
                 if failures:text=contextual_product_fallback(context,message,history)
             except Exception as exc:
                 errors.append(f"information_generation:{type(exc).__name__}");text=contextual_product_fallback(context,message,history)
@@ -160,13 +161,15 @@ class BlissireeOrchestrator:
                 progress_failures=response_progress_failures(text,history,stage)
                 progress_failures+=recommendation_fulfilment_failures(text,[r.title for r in immediate+long_term],stage)
                 persona_failures=persona_quality_failures(text,persona,history,message,"SUPPORT")
-                failures.extend(progress_failures+persona_failures);valid=valid and not progress_failures and not persona_failures
+                review_failures=self.reviewer.review(text,message,history,"SUPPORT").failures
+                failures.extend(progress_failures+persona_failures+review_failures);valid=valid and not progress_failures and not persona_failures and not review_failures
                 validation="pass" if valid else "failed:"+",".join(failures)
                 if not valid and (progress_failures or persona_failures):
-                    text,usage=self.conversation.generate(contract,message,history,"; ".join(progress_failures+persona_failures))
+                    text,usage=self.conversation.generate(contract,message,history,"; ".join(progress_failures+persona_failures+review_failures))
                     valid,failures=self.validator.validate(text,{r.title for r in immediate+long_term},known_titles) if self.config.output_validation_enabled else (True,[])
-                    remaining=response_progress_failures(text,history,stage)+recommendation_fulfilment_failures(text,[r.title for r in immediate+long_term],stage)+persona_quality_failures(text,persona,history,message,"SUPPORT")
-                    if remaining or not valid:text=progress_fallback(persona,message,history) if stage=="SUPPORT_ACTION" else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
+                    remaining=response_progress_failures(text,history,stage)+recommendation_fulfilment_failures(text,[r.title for r in immediate+long_term],stage)+persona_quality_failures(text,persona,history,message,"SUPPORT")+self.reviewer.review(text,message,history,"SUPPORT").failures
+                    if remaining or not valid:
+                        text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user)) if immediate else self.reviewer.fallback(persona,message,history)
                     validation="pass:regenerated" if not remaining and valid else "fallback:"+",".join(remaining or failures)
                 elif not valid:text=progress_fallback(persona,message,history) if conversation_intent.mode=="SUPPORT" and history else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
             except Exception as exc:

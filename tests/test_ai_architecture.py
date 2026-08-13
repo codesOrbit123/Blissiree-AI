@@ -14,6 +14,7 @@ from blissiree.conversation_state import apply_latest_message_authority,conversa
 from blissiree.schemas import ConversationContext
 from blissiree.persona import persona_quality_failures,persona_requirements
 from blissiree.capability_router import public_agent,route_capability
+from blissiree.response_reviewer import ResponseReviewAgent
 
 class TriageTests(unittest.TestCase):
     def setUp(self): self.engine=TriageEngine()
@@ -304,6 +305,19 @@ class CapabilityRouterTests(unittest.TestCase):
         failures=recommendation_fulfilment_failures("I can share some options.",["Stress and Tension Management Collection"],"RECOMMENDATION")
         self.assertIn("missing_eligible_recommendation_title",failures)
         self.assertEqual(recommendation_fulfilment_failures("Try the Stress and Tension Management Collection.",["Stress and Tension Management Collection"],"RECOMMENDATION"),[])
+
+class ResponseReviewAgentTests(unittest.TestCase):
+    def setUp(self):self.reviewer=ResponseReviewAgent()
+    def test_rejects_generic_reply_to_work_overload(self):
+        result=self.reviewer.review("I’ve heard the details you’ve shared. Let’s pause for one breath.","i had a work overload",[],"SUPPORT")
+        self.assertFalse(result.passed);self.assertIn("missing_latest_message_correlation",result.failures)
+    def test_accepts_specific_emma_correlation(self):
+        text="Having that much work land on you can leave you feeling stretched. What part of the workload is weighing on you most?"
+        self.assertTrue(self.reviewer.review(text,"i had a work overload",[],"SUPPORT").passed)
+    def test_discussion_switch_stops_audio_push(self):
+        result=self.reviewer.review("Try the Stress Collection.","done with audios, I want to discuss my problem",[],"SUPPORT")
+        self.assertIn("ignored_discussion_preference",result.failures)
+        self.assertIn("leave the audios",self.reviewer.fallback("emma","done with audios, I want to discuss my problem",[]))
     def test_natural_platform_language_routes_to_overview(self):
         context=fallback_context("I am interested in knowing about platform",[])
         self.assertEqual(context.intent,"PRODUCT_INFORMATION");self.assertEqual(context.active_topic,"BLISSIREE_OVERVIEW")

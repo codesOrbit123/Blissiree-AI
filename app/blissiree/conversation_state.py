@@ -27,6 +27,18 @@ def context_query(context:ConversationContext,message:str) -> str:
     return " ".join(x for x in (context.active_topic.replace("_"," "),context.user_goal,context.question_to_answer,message) if x)
 
 
+def reconcile_context(context:ConversationContext,message:str,history:list[dict]) -> ConversationContext:
+    """Resolve a short answer against the immediately pending product question."""
+    if not history:return context
+    recent=" ".join(str(x.get("content","")) for x in history[-6:]).lower()
+    short=len(message.split())<=5
+    pending_product=any(x in recent for x in ("which program","which offering","program would you like","blissiree offers","boost library","emotional empowerment"))
+    if short and pending_product and re.search(r"\b(emotional support|confidence|resilience|sleep|stress|focus|personal growth)\b",message,re.I):
+        return context.model_copy(update={"intent":"PRODUCT_INFORMATION","active_topic":"BLISSIREE_PROGRAMS","is_follow_up":True,
+            "question_to_answer":f"Which Blissiree offering is relevant to {message.strip()}?","conversation_stage":"INFORMATION","confidence":max(context.confidence,.85)})
+    return context
+
+
 def information_quality_failures(text:str,context:ConversationContext) -> list[str]:
     if context.intent!="PRODUCT_INFORMATION":return []
     failures=[];lower=text.lower()

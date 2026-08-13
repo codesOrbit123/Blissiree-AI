@@ -10,7 +10,7 @@ from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
 from blissiree.conversation_intent import ConversationIntent,classify_conversation_intent,contextual_fallback,conversation_stage
 from blissiree.product_info import is_product_information_request,product_information_response
 from blissiree.intent_router import BOOKING_URL,consultation_booking_response,route_top_level_intent
-from blissiree.conversation_state import conversation_brief,fallback_context,information_quality_failures,progress_fallback,response_progress_failures,support_progress_stage
+from blissiree.conversation_state import conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,response_progress_failures,support_progress_stage
 from blissiree.schemas import ConversationContext
 
 class TriageTests(unittest.TestCase):
@@ -251,6 +251,11 @@ class ContextEngineTests(unittest.TestCase):
     def test_indirect_curiosity_opening_fails_information_quality(self):
         context=ConversationContext(intent="PRODUCT_INFORMATION",active_topic="BLISSIREE_OVERVIEW")
         self.assertIn("indirect_information_opening",information_quality_failures("It sounds like you're curious about Blissiree.",context))
+    def test_short_answer_is_reconciled_with_pending_program_question(self):
+        context=ConversationContext(intent="COMPANION_SUPPORT",active_topic="USER_SITUATION",question_to_answer="What support does the user need?")
+        history=[{"role":"assistant","content":"Blissiree offers Emotional Empowerment and Unstoppable You. Which program would you like explained?"}]
+        result=reconcile_context(context,"emotional support",history)
+        self.assertEqual(result.intent,"PRODUCT_INFORMATION");self.assertEqual(result.active_topic,"BLISSIREE_PROGRAMS")
 
 class ConsultationBookingTests(unittest.TestCase):
     def test_direct_free_consultation_booking_is_routed(self):

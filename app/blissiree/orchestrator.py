@@ -11,7 +11,7 @@ from .schemas import MentalStateAnalysis,ResponseContract,UserState
 from .conversation_intent import classify_conversation_intent, contextual_fallback, conversation_stage, stage_guidance
 from .product_info import contextual_product_fallback
 from .intent_router import route_top_level_intent,consultation_booking_response
-from .conversation_state import context_query,conversation_brief,fallback_context,information_quality_failures,progress_fallback,response_progress_failures,support_progress_stage
+from .conversation_state import context_query,conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,response_progress_failures,support_progress_stage
 
 log = logging.getLogger("blissiree.ai")
 
@@ -47,6 +47,7 @@ class BlissireeOrchestrator:
         try:context=self.analysis.contextualize(message,history) if self.config.analysis_enabled else fallback_context(message,history)
         except Exception as exc:
             errors.append(f"context:{type(exc).__name__}");context=fallback_context(message,history)
+        context=reconcile_context(context,message,history)
         context_ms=round((time.perf_counter()-context_started)*1000)
         routed_intent=route_top_level_intent(message,history)
         booking_safety_context="\n".join([str(x.get("content","")) for x in history[-4:] if x.get("role")=="user"]+[message])

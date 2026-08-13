@@ -66,6 +66,10 @@ question. For REFUSAL, respect the boundary and end without a question. Do not f
 use relevant supplied Terri companion exemplars silently, and ask one useful non-repetitive question. In those stages never name, offer, tease, or
 recommend a Blissiree audio, Boost, collection, or Program—even if retrieved knowledge mentions one. RECOMMENDATION permits only the eligible exact
 resource in immediate_recommendations or long_term_recommendations. Never rush from disclosure to product."""
+        system += """ Treat conversation_brief as already-known user context. Never ask the user to repeat a fact, emotion, loss, or need recorded there.
+When conversation_stage is SUPPORT_ACTION, stop interviewing: reflect the concrete situation and offer one small supportive action. A question is optional,
+not required. Never reuse a generic question from recent_history. Follow persona_requirements as mandatory behavioral constraints: Emma must feel emotionally
+present and gently relational; Ben must feel steady, structured and practical. Their replies to the same situation must not be interchangeable."""
         prompt = {"response_contract": contract.model_dump(), "recent_history": history[-8:], "user_message": message}
         response = self.client.models.generate_content(
             model=self.config.conversation_model, contents=json.dumps(prompt,ensure_ascii=False),

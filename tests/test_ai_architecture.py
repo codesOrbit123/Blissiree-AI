@@ -10,6 +10,7 @@ from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
 from blissiree.conversation_intent import ConversationIntent,classify_conversation_intent,contextual_fallback,conversation_stage
 from blissiree.product_info import is_product_information_request,product_information_response
 from blissiree.intent_router import BOOKING_URL,consultation_booking_response,route_top_level_intent
+from blissiree.conversation_state import conversation_brief,progress_fallback,response_progress_failures,support_progress_stage
 
 class TriageTests(unittest.TestCase):
     def setUp(self): self.engine=TriageEngine()
@@ -196,6 +197,35 @@ class ProductInformationTests(unittest.TestCase):
     def test_official_site_knowledge_is_loaded(self):
         repo=KnowledgeRepository(Path(__file__).parents[1]/"knowledge")
         self.assertTrue(any(d["source"]=="BLISSIREE_OFFICIAL_WEBSITE" for d in repo.documents))
+    def test_blissiree_overview_explains_the_platform(self):
+        text=product_information_response("What is Blissiree?",[])
+        self.assertIn("wellbeing and personal-development platform",text)
+        self.assertIn("Emma and Ben AI companions",text)
+    def test_emotional_empowerment_gets_specific_details(self):
+        text=product_information_response("What is the Emotional Empowerment Program?",[])
+        self.assertIn("structured 14-session",text)
+        self.assertNotIn("three main in-app pathways",text)
+    def test_emotional_topic_change_ends_product_mode(self):
+        history=[{"role":"user","content":"What is Blissiree?"},{"role":"assistant","content":"Blissiree is a platform."}]
+        self.assertFalse(is_product_information_request("ok i am sad",history))
+
+class ConversationProgressTests(unittest.TestCase):
+    def setUp(self):
+        self.history=[{"role":"user","content":"I am remembering my dead cat"},{"role":"assistant","content":"Would you like to share more?"},
+                      {"role":"user","content":"Her colour was white"},{"role":"assistant","content":"What comes to mind?"},
+                      {"role":"user","content":"Sadness"},{"role":"assistant","content":"What feels most present?"}]
+    def test_known_facts_are_compiled(self):
+        brief=conversation_brief("my brain is stuck in thoughts of her",self.history)
+        self.assertIn("colour white",brief);self.assertIn("sadness",brief);self.assertIn("stuck",brief)
+    def test_longer_conversation_moves_to_support_action(self):
+        self.assertEqual(support_progress_stage("my brain is stuck",self.history),"SUPPORT_ACTION")
+    def test_generic_question_is_blocked_after_context(self):
+        failures=response_progress_failures("What feels most important right now?",self.history,"SUPPORT_ACTION")
+        self.assertIn("generic_question_after_context",failures)
+    def test_persona_fallbacks_are_distinct_and_contextual(self):
+        emma=progress_fallback("emma","I am stuck in thoughts of her",self.history)
+        ben=progress_fallback("ben","I am stuck in thoughts of her",self.history)
+        self.assertIn("white fur",emma);self.assertIn("feet on the floor",ben);self.assertNotEqual(emma,ben)
 
 class ConsultationBookingTests(unittest.TestCase):
     def test_direct_free_consultation_booking_is_routed(self):

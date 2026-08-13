@@ -48,4 +48,6 @@ class ResponseContract(BaseModel):
     compiled_instructions: list[dict] = []
     interaction_mode: Literal["SUPPORT", "CASUAL", "OUT_OF_SCOPE", "REFUSAL", "FEEDBACK"] = "SUPPORT"
     response_guidance: str | None = None
-    conversation_stage: Literal["DISCOVERY", "EXPLORATION", "RECOMMENDATION"] = "DISCOVERY"
+    conversation_stage: Literal["DISCOVERY", "EXPLORATION", "SUPPORT_ACTION", "RECOMMENDATION"] = "DISCOVERY"
+    conversation_brief: str | None = None
+    persona_requirements: list[str] = []

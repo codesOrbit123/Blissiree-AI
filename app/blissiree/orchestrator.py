@@ -11,6 +11,7 @@ from .schemas import MentalStateAnalysis, ResponseContract, UserState
 from .conversation_intent import classify_conversation_intent, contextual_fallback, conversation_stage, stage_guidance
 from .product_info import is_product_information_request,product_information_response
 from .intent_router import route_top_level_intent,consultation_booking_response
+from .conversation_state import conversation_brief,progress_fallback,response_progress_failures,support_progress_stage
 
 log = logging.getLogger("blissiree.ai")
 
@@ -77,6 +78,8 @@ class BlissireeOrchestrator:
         horizon=self.horizon.classify(safety_context,analysis)
         conversation_intent=classify_conversation_intent(message,analysis)
         stage=conversation_stage(message,history)
+        progress_stage=support_progress_stage(message,history)
+        if stage != "RECOMMENDATION":stage=progress_stage
         t=time.perf_counter(); docs=self.repo.retrieve(message) if self.config.rag_enabled else []
         if self.config.rag_enabled and self.training_store:docs.extend(self.training_store.retrieve_knowledge(message,target=persona.upper()))
         retrieval_ms=round((time.perf_counter()-t)*1000)
@@ -97,7 +100,9 @@ class BlissireeOrchestrator:
             compiled_instructions=[{"id":x["id"],"instruction":x["instruction"],"priority":x["priority"]} for x in (self.training_store.effective(persona.upper()) if self.training_store else [])],
             interaction_mode=conversation_intent.mode,
             response_guidance=" ".join(x for x in (conversation_intent.guidance,stage_guidance(stage)) if x),
-            conversation_stage=stage)
+            conversation_stage=stage,conversation_brief=conversation_brief(message,history),
+            persona_requirements=(["Name the specific emotion or detail already shared.","Create emotional safety before guidance.","Use gentle, natural language and one unhurried next step."] if persona=="emma" else
+                                  ["Summarize the concrete situation clearly.","Provide stability through structure.","Offer one practical, manageable next step."]))
         t=time.perf_counter(); usage={}; validation="fallback"
         if triage.blocks_recommendations:
             text=deterministic_crisis_response(triage.level,message)
@@ -110,8 +115,10 @@ class BlissireeOrchestrator:
                     x["display_title"] for x in self.repo.catalog["boosts"]}|{
                     "Emotional Empowerment Program","Unstoppable You Program"}
                 valid,failures=self.validator.validate(text,{r.title for r in immediate+long_term},known_titles) if self.config.output_validation_enabled else (True,[])
+                progress_failures=response_progress_failures(text,history,stage)
+                failures.extend(progress_failures);valid=valid and not progress_failures
                 validation="pass" if valid else "failed:"+",".join(failures)
-                if not valid: text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
+                if not valid:text=progress_fallback(persona,message,history) if progress_failures else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
             except Exception as exc:
                 errors.append(f"generation:{type(exc).__name__}"); text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
         generation_ms=round((time.perf_counter()-t)*1000)

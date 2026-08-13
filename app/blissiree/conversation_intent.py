@@ -147,6 +147,12 @@ def stage_guidance(stage: str) -> str:
             "Continue the companion conversation. Reflect the new detail and ask one next useful, non-repetitive question "
             "based on what remains unclear. Do not name, offer, or recommend a Blissiree audio, Boost, collection, or Program yet."
         )
+    if stage == "SUPPORT_ACTION":
+        return (
+            "Enough relevant details have already been shared. Do not ask another discovery question or ask the user to repeat themselves. "
+            "Reflect the specific topic, facts and emotion already known, then offer one small persona-appropriate supportive action. "
+            "Do not recommend Blissiree content unless the user explicitly requests it."
+        )
     return (
         "Enough conversational context is available, or the user directly requested a recommendation. If an eligible exact "
         "resource is supplied, connect at most one primary recommendation to the user's observable pattern. Otherwise continue "

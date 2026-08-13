@@ -273,6 +273,11 @@ class ContextEngineTests(unittest.TestCase):
         self.assertEqual(result.intent,"RESOURCE_GUIDANCE")
         self.assertEqual(result.resolved_reference,"work stress content")
         self.assertFalse(result.needs_clarification)
+    def test_short_followup_resolves_natural_content_offer_wording(self):
+        history=[{"role":"assistant","content":"I can show you relevant work-stress content if you would like."}]
+        result=resolve_conversation_reference(ConversationContext(intent="RESOURCE_GUIDANCE"),"please share",history)
+        self.assertEqual(result.resolved_reference,"work stress content")
+        self.assertFalse(result.needs_clarification)
     def test_short_followup_without_context_clarifies(self):
         result=resolve_conversation_reference(ConversationContext(intent="OUT_OF_SCOPE"),"please share",[])
         self.assertEqual(result.intent,"RESOURCE_GUIDANCE")

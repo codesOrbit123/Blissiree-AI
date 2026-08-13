@@ -76,7 +76,7 @@ def resolve_conversation_reference(context:ConversationContext,message:str,histo
     topic=None
     for label,pattern in (("work stress",r"work.{0,30}stress|stress.{0,30}work"),("sleep",r"sleep"),("confidence",r"confidence|self-belief|self-esteem"),("stress",r"stress|tension")):
         if re.search(pattern,recent,re.I):topic=label;break
-    offered=bool(re.search(r"\b(audio|boost|collection|program|blissiree|offer|recommend)\b",recent,re.I))
+    offered=bool(re.search(r"\b(audio|boost|collection|program|blissiree|content|offer|recommend|show you)\b",recent,re.I))
     if offered:
         reference=(topic+" content") if topic else "the Blissiree content just offered"
         return context.model_copy(update={"intent":"RESOURCE_GUIDANCE","active_topic":"USER_SITUATION","is_follow_up":True,

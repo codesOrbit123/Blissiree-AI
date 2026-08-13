@@ -77,6 +77,8 @@ def response_progress_failures(text:str,history:list[dict],stage:str) -> list[st
     if stage=="SUPPORT_ACTION" and any(q in lower for q in GENERIC_QUESTIONS):failures.append("generic_question_after_context")
     if stage=="SUPPORT_ACTION" and re.search(r"\b(audio|boost|collection|program)\b",text,re.I):failures.append("unsolicited_resource_in_support_action")
     recent_assistant=[str(x.get("content","")) for x in history[-8:] if x.get("role")=="assistant"]
+    normalized=lambda s:re.sub(r"\s+"," ",s.strip().lower())
+    if any(normalized(text)==normalized(prior) for prior in recent_assistant):failures.append("repeated_full_response")
     questions=[q.strip().lower() for q in re.findall(r"[^?]+\?",text)]
     for question in questions:
         words={w for w in re.findall(r"[a-z']+",question) if len(w)>3}
@@ -90,6 +92,10 @@ def progress_fallback(persona:str,message:str,history:list[dict]) -> str:
     all_user=" ".join(str(x.get("content","")) for x in history[-10:] if x.get("role")=="user")+" "+message
     if re.search(r"\b(cat|kitten|pet)\b",all_user,re.I) and re.search(r"\b(dead|died|sad|sadness|stuck|thought)\b",all_user,re.I):
         accident=bool(re.search(r"\b(accident|cliff|crash|car)\b",all_user,re.I))
+        if re.search(r"\b(peace|calm|settle|quiet)\b",message,re.I):
+            return ("Let’s make room for a little calm without asking you to erase what happened. Feel the support beneath your feet, let your shoulders soften, and take one unforced breath. For the next moment, you can hold a gentler memory of your cat rather than the accident itself."
+                    if persona=="emma" else
+                    "Let’s focus on calm first. Put both feet on the floor, breathe out slowly, and name three things you can see. For the next five minutes, choose one memory of your cat from before the accident and let the accident image stay in the background.")
         return (("That was a sudden and frightening loss, and the accident still seems close in your mind. We don’t have to force the memory away. Let’s slow this moment down gently and notice what you need most right now: space to remember your cat, or a brief pause from the accident memory."
                  if accident else "The sadness of losing your cat is still close, and your thoughts seem caught around her. We don’t have to force that away. Let’s slow this moment down gently and notice one memory of her that feels comforting rather than painful.")
                 if persona=="emma" else

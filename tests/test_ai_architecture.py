@@ -231,6 +231,13 @@ class ConversationProgressTests(unittest.TestCase):
     def test_unsolicited_audio_is_blocked_during_support(self):
         failures=response_progress_failures("Would you like to try a brief audio?",self.history,"SUPPORT_ACTION")
         self.assertIn("unsolicited_resource_in_support_action",failures)
+    def test_repeated_full_response_is_blocked(self):
+        history=[{"role":"assistant","content":"Let’s slow this moment down gently."}]
+        self.assertIn("repeated_full_response",response_progress_failures("Let’s slow this moment down gently.",history,"SUPPORT_ACTION"))
+    def test_peace_request_advances_accident_fallback(self):
+        history=[{"role":"user","content":"my cat died in a car accident"}]
+        text=progress_fallback("emma","I want some peace of mind",history)
+        self.assertIn("little calm",text);self.assertNotIn("what you need most",text)
     def test_persona_fallbacks_are_distinct_and_contextual(self):
         emma=progress_fallback("emma","I am stuck in thoughts of her",self.history)
         ben=progress_fallback("ben","I am stuck in thoughts of her",self.history)

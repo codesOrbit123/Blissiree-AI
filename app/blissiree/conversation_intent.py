@@ -113,6 +113,10 @@ def contextual_fallback(persona: str, message: str, intent: ConversationIntent, 
             else "That is a serious financial loss, and the immediate emotional impact can be intense. What needs attention first—the shock, your next practical step, or getting steadier right now?"
         )
     if has_context:
+        if re.search(r"\b(sad|sadness|low|crying)\b",message,re.I):
+            return ("You’re feeling sad today, and we can stay with that gently. What happened today, or what has been coming back to mind?"
+                    if persona=="emma" else
+                    "You’re feeling sad today. Let’s understand what is driving it so we can choose a manageable next step. What has been weighing on you?")
         return (
             "I’m listening. Tell me what part of this feels most important right now, and we can take it one step at a time."
             if persona == "emma"

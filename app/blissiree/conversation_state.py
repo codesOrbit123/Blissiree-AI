@@ -44,7 +44,7 @@ def reconcile_context(context:ConversationContext,message:str,history:list[dict]
 
 def apply_latest_message_authority(context:ConversationContext,message:str,history:list[dict]) -> ConversationContext:
     """Explicit current words override weaker emotional inference from prior turns."""
-    updates={};themes=[]
+    updates={"raw_user_message":message};themes=[]
     if CONFIDENCE_TYPO.search(message):themes.append("LOW_CONFIDENCE")
     if SADNESS_EXPLICIT.search(message):themes.append("SADNESS")
     if themes:
@@ -62,7 +62,8 @@ def apply_latest_message_authority(context:ConversationContext,message:str,histo
     if correction:updates.update({"intent":"FEEDBACK","user_goal":"correct the misunderstanding about low confidence",
                                   "question_to_answer":"Acknowledge that the user meant confidence, not sadness, then continue naturally.",
                                   "current_explicit_themes":["LOW_CONFIDENCE"],"reported_emotions":[]})
-    return context.model_copy(update=updates) if updates else context
+    if not context.interpreted_message:updates["interpreted_message"]=context.question_to_answer or message
+    return context.model_copy(update=updates)
 
 
 def resolve_conversation_reference(context:ConversationContext,message:str,history:list[dict]) -> ConversationContext:

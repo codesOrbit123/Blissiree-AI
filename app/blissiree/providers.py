@@ -51,7 +51,8 @@ to emotional support, not necessarily a new personal disclosure. PRODUCT_INFORMA
 services. RESOURCE_GUIDANCE means the user seeks a suitable audio or program for their own situation. COMPANION_SUPPORT means they want discussion or
 emotional support. CONSULTATION_BOOKING requires clear booking intent. Set question_to_answer to the direct question the reply must answer.
 needs_clarification is true only when no useful answer is possible from approved knowledge. Track concrete known facts and what was already answered.
-Do not diagnose."""
+Preserve raw_user_message exactly. interpreted_message may clarify wording but must not add emotions, causes, diagnoses or intentions.
+Keep explicit themes separate from inferred themes and record genuine ambiguities. Do not diagnose."""
         response=self.client.models.generate_content(model=self.config.analysis_model,contents=json.dumps(prompt,ensure_ascii=False),
             config=types.GenerateContentConfig(system_instruction=system,response_mime_type="application/json",response_schema=ConversationContext,
                 temperature=0,max_output_tokens=700,thinking_config=types.ThinkingConfig(thinking_budget=0)))
@@ -73,6 +74,8 @@ evidence, testimonials, or other people's experiences. Never use a story to pers
 explicitly asks for experiences, attribute each one as an individual personal report. Never repeat comparisons to drugs or medication,
 treatment/diagnosis claims, or claimed brain/body changes. Typical response under 130 words. Ask at most one question. Respect resolution, refusal,
 thanks, and goodbye: acknowledge briefly and end without another question, recommendation, or attempt to continue."""
+        system += """ Use natural Australian English spelling and grammar where applicable, without slang or caricature. The selected persona remains
+the same across reception, information, discussion, content matching and booking. Never mention internal agents, routing or transfers."""
         system += """ Keep a consistent adult-to-adult tone. Be warm without becoming sentimental, theatrical, patronising, or overly familiar.
 Never address the user as "my dear", "dear", "sweetheart", or similar endearments. Do not repeatedly say that a feeling is understandable or restate
 the same validation on consecutive turns. Avoid stacked intensifiers such as "truly", "incredibly", "completely", or "devastating". Each reply should move the conversation forward through one specific reflection, one useful question, or one

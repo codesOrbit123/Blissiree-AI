@@ -13,6 +13,7 @@ from blissiree.intent_router import BOOKING_URL,consultation_booking_response,ro
 from blissiree.conversation_state import apply_latest_message_authority,conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
 from blissiree.schemas import ConversationContext
 from blissiree.persona import persona_quality_failures,persona_requirements
+from blissiree.capability_router import public_agent,route_capability
 
 class TriageTests(unittest.TestCase):
     def setUp(self): self.engine=TriageEngine()
@@ -276,6 +277,18 @@ class ContextEngineTests(unittest.TestCase):
         result=resolve_conversation_reference(ConversationContext(intent="OUT_OF_SCOPE"),"please share",[])
         self.assertEqual(result.intent,"RESOURCE_GUIDANCE")
         self.assertTrue(result.needs_clarification)
+
+class CapabilityRouterTests(unittest.TestCase):
+    def route(self,intent,history=None,**kwargs):
+        return route_capability(ConversationContext(intent=intent,confidence=.9),history or [],**kwargs)
+    def test_platform_information_agent(self):self.assertEqual(self.route("PRODUCT_INFORMATION").active_agent,"PLATFORM_INFORMATION")
+    def test_discussion_agent(self):self.assertEqual(self.route("COMPANION_SUPPORT").active_agent,"DISCUSSION")
+    def test_content_matching_agent(self):self.assertEqual(self.route("RESOURCE_GUIDANCE").active_agent,"CONTENT_MATCHING")
+    def test_booking_agent(self):self.assertEqual(self.route("CONSULTATION_BOOKING").active_agent,"BOOKING")
+    def test_safety_overrides_every_capability(self):self.assertEqual(self.route("PRODUCT_INFORMATION",safety_override=True).active_agent,"SAFETY")
+    def test_previous_agent_continues_as_safe_metadata(self):
+        route=self.route("CONSULTATION_BOOKING",[{"role":"assistant","content":"...","active_agent":"DISCUSSION"}])
+        self.assertEqual(public_agent(route),{"id":"BOOKING","label":"Booking","previous":"DISCUSSION"})
     def test_natural_platform_language_routes_to_overview(self):
         context=fallback_context("I am interested in knowing about platform",[])
         self.assertEqual(context.intent,"PRODUCT_INFORMATION");self.assertEqual(context.active_topic,"BLISSIREE_OVERVIEW")

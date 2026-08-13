@@ -38,6 +38,9 @@ class ConversationContext(BaseModel):
     current_inferred_themes: list[str] = []
     resolved_reference: str | None = None
     pending_offer_type: str | None = None
+    raw_user_message: str = ""
+    interpreted_message: str = ""
+    ambiguities: list[str] = []
 
 class Recommendation(BaseModel):
     id: str

@@ -7,12 +7,13 @@ from .knowledge import KnowledgeRepository
 from .providers import AnalysisLLMProvider, ConversationLLMProvider
 from .recommendations import ImmediateSupportEngine, LongTermJourneyEngine, SupportHorizonClassifier
 from .safety import OutputSafetyValidator, TriageEngine, deterministic_crisis_response, terminal_turn_kind, terminal_turn_response
-from .schemas import MentalStateAnalysis,ResponseContract,UserState
+from .schemas import ConversationContext,MentalStateAnalysis,ResponseContract,UserState
 from .conversation_intent import classify_conversation_intent, contextual_fallback, conversation_stage, stage_guidance
 from .product_info import contextual_product_fallback
 from .intent_router import route_top_level_intent,consultation_booking_response
 from .conversation_state import apply_latest_message_authority,context_query,conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
 from .persona import persona_quality_failures,persona_requirements
+from .capability_router import public_agent,route_capability
 
 log = logging.getLogger("blissiree.ai")
 
@@ -35,6 +36,7 @@ class BlissireeOrchestrator:
         request_id=str(uuid.uuid4()); started=time.perf_counter(); errors=[]
         terminal_kind=terminal_turn_kind(message,self.triage)
         if terminal_kind:
+            route=route_capability(ConversationContext(),history,terminal=True)
             text=terminal_turn_response(persona,terminal_kind)
             event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
                 "conversation_model":self.config.conversation_model,"triage_level":"T7","retrieved_content_ids":[],"recommended_boost_ids":[],
@@ -43,7 +45,7 @@ class BlissireeOrchestrator:
                 "latency_total_ms":round((time.perf_counter()-started)*1000),"token_usage":{},"model_errors":[],
                 "output_validation_result":"pass:terminal_"+terminal_kind}
             log.info(json.dumps(event,separators=(",",":")))
-            return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":[]}
+            return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":[],"active_agent":public_agent(route)}
         context_started=time.perf_counter()
         try:context=self.analysis.contextualize(message,history) if self.config.analysis_enabled else fallback_context(message,history)
         except Exception as exc:
@@ -54,6 +56,7 @@ class BlissireeOrchestrator:
         booking_safety_context="\n".join([str(x.get("content","")) for x in history[-4:] if x.get("role")=="user"]+[message])
         booking_safety=self.triage.evaluate(booking_safety_context,MentalStateAnalysis())
         if (context.intent=="CONSULTATION_BOOKING" or routed_intent.kind == "CONSULTATION_BOOKING") and not booking_safety.blocks_recommendations:
+            route=route_capability(context.model_copy(update={"intent":"CONSULTATION_BOOKING"}),history)
             text=consultation_booking_response(routed_intent.service,persona)
             event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
                 "conversation_model":self.config.conversation_model,"triage_level":"T7","retrieved_content_ids":["official-site:consultations"],
@@ -62,8 +65,9 @@ class BlissireeOrchestrator:
                 "latency_total_ms":round((time.perf_counter()-started)*1000),"token_usage":{},"model_errors":[],
                 "output_validation_result":"pass:consultation_booking","conversation_stage":"BOOKING","service":routed_intent.service}
             log.info(json.dumps(event,separators=(",",":")))
-            return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":["BLISSIREE_OFFICIAL_WEBSITE"]}
+            return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":["BLISSIREE_OFFICIAL_WEBSITE"],"active_agent":public_agent(route)}
         if context.intent=="PRODUCT_INFORMATION":
+            route=route_capability(context,history)
             query=context_query(context,message);t=time.perf_counter();docs=self.repo.retrieve(query) if self.config.rag_enabled else []
             docs=[d for d in docs if d["source"]=="BLISSIREE_OFFICIAL_WEBSITE"][:6];retrieval_ms=round((time.perf_counter()-t)*1000)
             contract=ResponseContract(persona=persona,user_state=UserState(triage="T7"),allowed_actions={"ask_followup":context.needs_clarification,"recommend_boost":False,"recommend_program":False,"assess_program":False,"use_pas":False},
@@ -91,7 +95,7 @@ class BlissireeOrchestrator:
                 "latency_total_ms":round((time.perf_counter()-started)*1000),"token_usage":usage,"model_errors":errors,
                 "output_validation_result":"pass:contextual_information" if not failures else "fallback:contextual_information","conversation_stage":"INFORMATION","active_topic":context.active_topic}
             log.info(json.dumps(event,separators=(",",":")))
-            return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":["BLISSIREE_OFFICIAL_WEBSITE"]}
+            return {"message":text,"persona":persona,"triage":"T7","request_id":request_id,"sources":["BLISSIREE_OFFICIAL_WEBSITE"],"active_agent":public_agent(route)}
         recent_user=[str(x.get("content","")) for x in history[-8:] if x.get("role")=="user"]
         safety_context="\n".join(recent_user[-3:]+[message])
         t=time.perf_counter()
@@ -104,6 +108,7 @@ class BlissireeOrchestrator:
             analysis.emotional_themes=list(context.current_explicit_themes)
         analysis_ms=round((time.perf_counter()-t)*1000)
         triage=self.triage.evaluate(safety_context,analysis)
+        route=route_capability(context,history,safety_override=triage.blocks_recommendations)
         horizon=self.horizon.classify(safety_context,analysis)
         conversation_intent=classify_conversation_intent(message,analysis)
         correction=context.intent=="FEEDBACK" and "LOW_CONFIDENCE" in context.current_explicit_themes
@@ -174,4 +179,4 @@ class BlissireeOrchestrator:
         event["conversation_stage"]=stage
         event["resolved_intent"]=context.intent;event["resolved_reference"]=context.resolved_reference;event["current_explicit_themes"]=context.current_explicit_themes
         log.info(json.dumps(event,separators=(",",":")))
-        return {"message":text,"persona":persona,"triage":triage.level,"request_id":request_id,"sources":sorted({d["source"] for d in docs})}
+        return {"message":text,"persona":persona,"triage":triage.level,"request_id":request_id,"sources":sorted({d["source"] for d in docs}),"active_agent":public_agent(route)}

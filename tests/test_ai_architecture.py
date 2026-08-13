@@ -111,6 +111,7 @@ class ConversationEndingTests(unittest.TestCase):
         self.assertNotIn("?",reply)
     def test_resolved_issue_closes_gently(self):
         self.assertEqual(terminal_turn_kind("my issue is solved",self.triage),"farewell")
+        self.assertEqual(terminal_turn_kind("im ok now thx",self.triage),"farewell")
     def test_short_thanks_does_not_repeat_recommendation(self):
         self.assertEqual(terminal_turn_kind("thanks alot emma you are best",self.triage),"thanks")
         self.assertNotIn("Collection",terminal_turn_response("emma","thanks"))

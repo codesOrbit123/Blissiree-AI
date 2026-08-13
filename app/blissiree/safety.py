@@ -12,7 +12,7 @@ PATTERNS = {
     "T6": re.compile(r"\b(overwhelmed|anxious|very stressed|grief|lonely|ruminating|poor sleep|painful memor|not feeling well|deeply upset|mind (?:is |feels )?(?:going to |gonna )?(?:blow|explode))\w*\b", re.I),
 }
 
-FAREWELL_PATTERN = re.compile(r"\b(good\s*bye|bye(?:\s+for\s+now)?|see\s+you|talk\s+(?:to\s+you\s+)?later|that(?:'s| is)\s+all|no\s+thanks?|nothing\s+else|issue\s+(?:is\s+)?solved|problem\s+(?:is\s+)?solved)\b", re.I)
+FAREWELL_PATTERN = re.compile(r"\b(good\s*bye|bye(?:\s+for\s+now)?|see\s+you|talk\s+(?:to\s+you\s+)?later|that(?:'s| is)\s+all|no\s+thanks?|nothing\s+else|issue\s+(?:is\s+)?solved|problem\s+(?:is\s+)?solved|i(?:'m| am|m)\s+(?:okay|ok|fine)\s+now(?:\s+(?:thanks?|thx))?)\b", re.I)
 THANKS_PATTERN = re.compile(r"^\s*(?:thanks?(?:\s+(?:a\s+lot|alot|very\s+much))?|thank\s+you)(?:[\s,!.'’]*(?:emma|ben|you\s+are\s+(?:the\s+)?best)\b[\s,!.'’]*)*$", re.I)
 
 @dataclass(frozen=True)

@@ -10,7 +10,7 @@ from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
 from blissiree.conversation_intent import ConversationIntent,classify_conversation_intent,contextual_fallback,conversation_stage
 from blissiree.product_info import is_product_information_request,product_information_response
 from blissiree.intent_router import BOOKING_URL,consultation_booking_response,route_top_level_intent
-from blissiree.conversation_state import apply_latest_message_authority,conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
+from blissiree.conversation_state import apply_latest_message_authority,conversation_brief,fallback_context,information_quality_failures,progress_fallback,recommendation_fulfilment_failures,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
 from blissiree.schemas import ConversationContext
 from blissiree.persona import persona_quality_failures,persona_requirements
 from blissiree.capability_router import public_agent,route_capability
@@ -289,6 +289,10 @@ class CapabilityRouterTests(unittest.TestCase):
     def test_previous_agent_continues_as_safe_metadata(self):
         route=self.route("CONSULTATION_BOOKING",[{"role":"assistant","content":"...","active_agent":"DISCUSSION"}])
         self.assertEqual(public_agent(route),{"id":"BOOKING","label":"Booking","previous":"DISCUSSION"})
+    def test_content_matching_must_fulfil_accepted_offer(self):
+        failures=recommendation_fulfilment_failures("I can share some options.",["Stress and Tension Management Collection"],"RECOMMENDATION")
+        self.assertIn("missing_eligible_recommendation_title",failures)
+        self.assertEqual(recommendation_fulfilment_failures("Try the Stress and Tension Management Collection.",["Stress and Tension Management Collection"],"RECOMMENDATION"),[])
     def test_natural_platform_language_routes_to_overview(self):
         context=fallback_context("I am interested in knowing about platform",[])
         self.assertEqual(context.intent,"PRODUCT_INFORMATION");self.assertEqual(context.active_topic,"BLISSIREE_OVERVIEW")

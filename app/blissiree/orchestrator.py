@@ -11,7 +11,7 @@ from .schemas import ConversationContext,MentalStateAnalysis,ResponseContract,Us
 from .conversation_intent import classify_conversation_intent, contextual_fallback, conversation_stage, stage_guidance
 from .product_info import contextual_product_fallback
 from .intent_router import route_top_level_intent,consultation_booking_response
-from .conversation_state import apply_latest_message_authority,context_query,conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
+from .conversation_state import apply_latest_message_authority,context_query,conversation_brief,fallback_context,information_quality_failures,progress_fallback,recommendation_fulfilment_failures,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
 from .persona import persona_quality_failures,persona_requirements
 from .capability_router import public_agent,route_capability
 
@@ -156,13 +156,14 @@ class BlissireeOrchestrator:
                     "Emotional Empowerment Program","Unstoppable You Program"}
                 valid,failures=self.validator.validate(text,{r.title for r in immediate+long_term},known_titles) if self.config.output_validation_enabled else (True,[])
                 progress_failures=response_progress_failures(text,history,stage)
+                progress_failures+=recommendation_fulfilment_failures(text,[r.title for r in immediate+long_term],stage)
                 persona_failures=persona_quality_failures(text,persona,history,message,"SUPPORT")
                 failures.extend(progress_failures+persona_failures);valid=valid and not progress_failures and not persona_failures
                 validation="pass" if valid else "failed:"+",".join(failures)
                 if not valid and (progress_failures or persona_failures):
                     text,usage=self.conversation.generate(contract,message,history,"; ".join(progress_failures+persona_failures))
                     valid,failures=self.validator.validate(text,{r.title for r in immediate+long_term},known_titles) if self.config.output_validation_enabled else (True,[])
-                    remaining=response_progress_failures(text,history,stage)+persona_quality_failures(text,persona,history,message,"SUPPORT")
+                    remaining=response_progress_failures(text,history,stage)+recommendation_fulfilment_failures(text,[r.title for r in immediate+long_term],stage)+persona_quality_failures(text,persona,history,message,"SUPPORT")
                     if remaining or not valid:text=progress_fallback(persona,message,history) if stage=="SUPPORT_ACTION" else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
                     validation="pass:regenerated" if not remaining and valid else "fallback:"+",".join(remaining or failures)
                 elif not valid:text=progress_fallback(persona,message,history) if conversation_intent.mode=="SUPPORT" and history else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))

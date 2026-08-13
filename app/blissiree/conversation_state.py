@@ -138,6 +138,11 @@ def response_progress_failures(text:str,history:list[dict],stage:str) -> list[st
     return failures
 
 
+def recommendation_fulfilment_failures(text:str,eligible_titles:list[str],stage:str) -> list[str]:
+    if stage!="RECOMMENDATION" or not eligible_titles:return []
+    return [] if any(title.lower() in text.lower() for title in eligible_titles) else ["missing_eligible_recommendation_title"]
+
+
 def progress_fallback(persona:str,message:str,history:list[dict]) -> str:
     all_user=" ".join(str(x.get("content","")) for x in history[-10:] if x.get("role")=="user")+" "+message
     if re.search(r"\b(cat|kitten|pet)\b",all_user,re.I) and re.search(r"\b(dead|died|sad|sadness|stuck|thought)\b",all_user,re.I):

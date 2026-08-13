@@ -33,6 +33,7 @@ def support_progress_stage(message:str,history:list[dict]) -> str:
 def response_progress_failures(text:str,history:list[dict],stage:str) -> list[str]:
     failures=[];lower=text.lower()
     if stage=="SUPPORT_ACTION" and any(q in lower for q in GENERIC_QUESTIONS):failures.append("generic_question_after_context")
+    if stage=="SUPPORT_ACTION" and re.search(r"\b(audio|boost|collection|program)\b",text,re.I):failures.append("unsolicited_resource_in_support_action")
     recent_assistant=[str(x.get("content","")) for x in history[-8:] if x.get("role")=="assistant"]
     questions=[q.strip().lower() for q in re.findall(r"[^?]+\?",text)]
     for question in questions:

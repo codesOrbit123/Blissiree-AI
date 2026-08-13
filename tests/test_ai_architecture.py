@@ -226,6 +226,9 @@ class ConversationProgressTests(unittest.TestCase):
     def test_generic_question_is_blocked_after_context(self):
         failures=response_progress_failures("What feels most important right now?",self.history,"SUPPORT_ACTION")
         self.assertIn("generic_question_after_context",failures)
+    def test_unsolicited_audio_is_blocked_during_support(self):
+        failures=response_progress_failures("Would you like to try a brief audio?",self.history,"SUPPORT_ACTION")
+        self.assertIn("unsolicited_resource_in_support_action",failures)
     def test_persona_fallbacks_are_distinct_and_contextual(self):
         emma=progress_fallback("emma","I am stuck in thoughts of her",self.history)
         ben=progress_fallback("ben","I am stuck in thoughts of her",self.history)

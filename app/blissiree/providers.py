@@ -31,6 +31,8 @@ Classify support_horizon as IMMEDIATE, SHORT_TERM, LONG_TERM, BOTH, or UNCLEAR. 
 only explicit program requests, persistent/repeated patterns, or desire for structured deeper change favor program intent.
 Classify intent as off_topic only when the request is unrelated to emotional wellbeing, personal development, Blissiree content, and the current conversation.
 Any stated feeling, stress, worry, relationship concern, support request, or request to calm down is general_support, never off_topic.
+The latest user message has highest authority for current state. Explicit low confidence or obvious misspellings such as confidenc3/confidance mean
+low confidence, not sadness, unless sadness is also explicitly stated. Keep explicit observations separate from weak inference.
 Return separate boost and program relevance. JSON input:\n""" + str(payload)
         response = self.client.models.generate_content(
             model=self.config.analysis_model, contents=prompt,
@@ -79,6 +81,9 @@ eligible next step. When the user criticises your tone, accept the feedback brie
 Never invent a sensory detail, colour, event, relationship or memory absent from recent_history or the current message. Avoid formulaic “It sounds like” openings.
 Follow the conversation-level sequence Recognition → Validation → Exploration → Insight → Supportive action; do not restart at recognition every turn.
 In distress, keep language calm and low-load, with at most one question or action. Do not stack dramatic labels or intensifiers."""
+        system += """ Give the current user message the strongest weight for current emotional meaning. Never convert explicit low confidence into sadness.
+If question_to_answer says the user is correcting a misunderstanding, acknowledge the correction explicitly and briefly before continuing.
+When a resolved reference or pending offer is supplied, fulfil that exact follow-up directly; never call it outside the role or restart assessment."""
         system += """ Follow interaction_mode and response_guidance. For OUT_OF_SCOPE requests, acknowledge what the user actually said, briefly state your
 Blissiree emotional-support and personal-development role, and offer a natural optional bridge back; never respond with a generic emotional-state
 question. For REFUSAL, respect the boundary and end without a question. Do not force every message into an emotional problem or recommendation."""

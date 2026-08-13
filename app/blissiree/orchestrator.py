@@ -11,7 +11,7 @@ from .schemas import MentalStateAnalysis,ResponseContract,UserState
 from .conversation_intent import classify_conversation_intent, contextual_fallback, conversation_stage, stage_guidance
 from .product_info import contextual_product_fallback
 from .intent_router import route_top_level_intent,consultation_booking_response
-from .conversation_state import context_query,conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,response_progress_failures,support_progress_stage
+from .conversation_state import apply_latest_message_authority,context_query,conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
 from .persona import persona_quality_failures,persona_requirements
 
 log = logging.getLogger("blissiree.ai")
@@ -48,7 +48,7 @@ class BlissireeOrchestrator:
         try:context=self.analysis.contextualize(message,history) if self.config.analysis_enabled else fallback_context(message,history)
         except Exception as exc:
             errors.append(f"context:{type(exc).__name__}");context=fallback_context(message,history)
-        context=reconcile_context(context,message,history)
+        context=resolve_conversation_reference(reconcile_context(apply_latest_message_authority(context,message,history),message,history),message,history)
         context_ms=round((time.perf_counter()-context_started)*1000)
         routed_intent=route_top_level_intent(message,history)
         booking_safety_context="\n".join([str(x.get("content","")) for x in history[-4:] if x.get("role")=="user"]+[message])
@@ -70,7 +70,7 @@ class BlissireeOrchestrator:
                 retrieved_knowledge=[{"id":d["id"],"source":d["source"],"authority":d["authority"],"text":d["text"]} for d in docs],
                 response_limits={"avoid_diagnosis":True,"avoid_medical_claims":True,"answer_question_directly":True},support_horizon="UNCLEAR",
                 interaction_mode="INFORMATION",response_guidance="Answer the actual product question directly from approved official knowledge.",conversation_stage="INFORMATION",
-                conversation_brief="Known context: "+"; ".join(context.known_facts+context.already_answered),question_to_answer=context.question_to_answer,
+                conversation_brief="Known context: "+"; ".join(context.known_facts+context.already_answered+context.current_explicit_themes),question_to_answer=context.question_to_answer,
                 persona_requirements=persona_requirements(persona))
             t=time.perf_counter();usage={};failures=[]
             product_titles={"Emotional Empowerment Program","Unstoppable You Program"}
@@ -99,19 +99,27 @@ class BlissireeOrchestrator:
             analysis=self.analysis.analyze({"message":message,"recentConversationSummary":history[-8:],"recentCheckins":{},"currentProgram":{},"userPreferences":{}}) if self.config.analysis_enabled else MentalStateAnalysis()
         except Exception as exc:
             errors.append(f"analysis:{type(exc).__name__}"); analysis=MentalStateAnalysis(confidence=0)
+        if context.current_explicit_themes:
+            analysis.reported_emotions=list(context.reported_emotions)
+            analysis.emotional_themes=list(context.current_explicit_themes)
         analysis_ms=round((time.perf_counter()-t)*1000)
         triage=self.triage.evaluate(safety_context,analysis)
         horizon=self.horizon.classify(safety_context,analysis)
         conversation_intent=classify_conversation_intent(message,analysis)
+        correction=context.intent=="FEEDBACK" and "LOW_CONFIDENCE" in context.current_explicit_themes
+        if context.intent in {"COMPANION_SUPPORT","RESOURCE_GUIDANCE"} or correction:conversation_intent=type(conversation_intent)("SUPPORT",None)
         if context.intent=="OUT_OF_SCOPE":conversation_intent=type(conversation_intent)("OUT_OF_SCOPE","Acknowledge the actual request and bridge naturally to Blissiree's role.")
-        elif context.intent=="FEEDBACK":conversation_intent=type(conversation_intent)("FEEDBACK","Accept the feedback and adjust directly.")
+        elif context.intent=="FEEDBACK" and not correction:conversation_intent=type(conversation_intent)("FEEDBACK","Accept the feedback and adjust directly.")
         elif context.intent=="REFUSAL":conversation_intent=type(conversation_intent)("REFUSAL","Respect the request for space and end without a question.")
-        stage=conversation_stage(message,history)
+        stage="RECOMMENDATION" if context.intent=="RESOURCE_GUIDANCE" and not context.needs_clarification else conversation_stage(message,history)
         if stage != "RECOMMENDATION":stage=context.conversation_stage if context.conversation_stage in {"DISCOVERY","EXPLORATION","SUPPORT_ACTION"} else support_progress_stage(message,history)
         t=time.perf_counter(); query=context_query(context,message);docs=self.repo.retrieve(query) if self.config.rag_enabled else []
         if self.config.rag_enabled and self.training_store:docs.extend(self.training_store.retrieve_knowledge(query,target=persona.upper()))
         retrieval_ms=round((time.perf_counter()-t)*1000)
-        immediate,clarification=self.immediate.recommend(safety_context,analysis,triage,self.repo,horizon,bool(recent_user))
+        recommendation_context=" ".join(x for x in (safety_context,context.resolved_reference or "",context.user_goal) if x)
+        immediate,clarification=self.immediate.recommend(recommendation_context,analysis,triage,self.repo,horizon,bool(recent_user))
+        if context.intent=="RESOURCE_GUIDANCE" and context.needs_clarification:
+            immediate=[];clarification=("Do you mean the Blissiree content I just mentioned?" if history else "What would you like me to share—an audio, a Program, or information about Blissiree?")
         program_assessment=self.long_term.assess(horizon,triage); long_term=[]
         if conversation_intent.mode != "SUPPORT":
             immediate,clarification,program_assessment=[],None,False
@@ -164,5 +172,6 @@ class BlissireeOrchestrator:
             "latency_analysis_ms":analysis_ms,"latency_retrieval_ms":retrieval_ms,"latency_generation_ms":generation_ms,
             "latency_total_ms":round((time.perf_counter()-started)*1000),"token_usage":usage,"model_errors":errors,"output_validation_result":validation}
         event["conversation_stage"]=stage
+        event["resolved_intent"]=context.intent;event["resolved_reference"]=context.resolved_reference;event["current_explicit_themes"]=context.current_explicit_themes
         log.info(json.dumps(event,separators=(",",":")))
         return {"message":text,"persona":persona,"triage":triage.level,"request_id":request_id,"sources":sorted({d["source"] for d in docs})}

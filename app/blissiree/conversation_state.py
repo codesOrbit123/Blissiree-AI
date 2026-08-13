@@ -9,6 +9,9 @@ GENERIC_QUESTIONS=(
 )
 
 PRODUCT_TOPICS={"BLISSIREE_OVERVIEW","BLISSIREE_PROGRAMS","EMOTIONAL_EMPOWERMENT","UNSTOPPABLE_YOU","BOOST_LIBRARY","CONSULTATIONS"}
+SHORT_REFERENCE=re.compile(r"^\s*(yes|yes please|please|please share|share it|show me|which one|tell me more|what about that|play it|give me one|which audio|what program|okay do that|the first one)\s*[?!.]*\s*$",re.I)
+CONFIDENCE_TYPO=re.compile(r"\b(confidence|confidenc3|confidance|self[- ]?belief|self[- ]?esteem)\b",re.I)
+SADNESS_EXPLICIT=re.compile(r"\b(sad|sadness|crying|unhappy|feeling low)\b",re.I)
 
 
 def fallback_context(message:str,history:list[dict]) -> ConversationContext:
@@ -39,6 +42,48 @@ def reconcile_context(context:ConversationContext,message:str,history:list[dict]
     return context
 
 
+def apply_latest_message_authority(context:ConversationContext,message:str,history:list[dict]) -> ConversationContext:
+    """Explicit current words override weaker emotional inference from prior turns."""
+    updates={};themes=[]
+    if CONFIDENCE_TYPO.search(message):themes.append("LOW_CONFIDENCE")
+    if SADNESS_EXPLICIT.search(message):themes.append("SADNESS")
+    if themes:
+        updates["current_explicit_themes"]=themes
+        updates["current_inferred_themes"]=[]
+        updates["reported_emotions"]=["sadness"] if "SADNESS" in themes else []
+        if "LOW_CONFIDENCE" in themes:
+            updates.update({"intent":"COMPANION_SUPPORT","active_topic":"USER_SITUATION","user_goal":"support with low confidence",
+                            "question_to_answer":"Support the user's explicitly stated low confidence as the current issue."})
+    elif context.intent=="PRODUCT_INFORMATION":
+        recent_users=" ".join(str(x.get("content","")) for x in history[-6:] if x.get("role")=="user")
+        if CONFIDENCE_TYPO.search(recent_users):
+            updates["current_explicit_themes"]=["LOW_CONFIDENCE"]
+    correction=re.search(r"\b(no|not|i said|meant)\b.*\b(confidence|confidenc3|confidance)\b",message,re.I)
+    if correction:updates.update({"intent":"FEEDBACK","user_goal":"correct the misunderstanding about low confidence",
+                                  "question_to_answer":"Acknowledge that the user meant confidence, not sadness, then continue naturally.",
+                                  "current_explicit_themes":["LOW_CONFIDENCE"],"reported_emotions":[]})
+    return context.model_copy(update=updates) if updates else context
+
+
+def resolve_conversation_reference(context:ConversationContext,message:str,history:list[dict]) -> ConversationContext:
+    """Resolve terse requests against the assistant's recent Blissiree offer before scope classification."""
+    if not SHORT_REFERENCE.fullmatch(message):return context
+    assistants=[str(x.get("content","")) for x in history[-6:] if x.get("role")=="assistant"]
+    recent=" ".join(assistants).lower()
+    if not recent:
+        return context.model_copy(update={"intent":"RESOURCE_GUIDANCE","needs_clarification":True,"question_to_answer":"Ask what the user wants shared.","confidence":.5})
+    topic=None
+    for label,pattern in (("work stress",r"work.{0,30}stress|stress.{0,30}work"),("sleep",r"sleep"),("confidence",r"confidence|self-belief|self-esteem"),("stress",r"stress|tension")):
+        if re.search(pattern,recent,re.I):topic=label;break
+    offered=bool(re.search(r"\b(audio|boost|collection|program|blissiree|offer|recommend)\b",recent,re.I))
+    if offered:
+        reference=(topic+" content") if topic else "the Blissiree content just offered"
+        return context.model_copy(update={"intent":"RESOURCE_GUIDANCE","active_topic":"USER_SITUATION","is_follow_up":True,
+            "needs_clarification":topic is None,"resolved_reference":reference,"pending_offer_type":"BOOST_RECOMMENDATION",
+            "question_to_answer":f"Fulfil the user's request for {reference}.","user_goal":reference,"conversation_stage":"RECOMMENDATION","confidence":.9 if topic else .65})
+    return context.model_copy(update={"intent":"RESOURCE_GUIDANCE","needs_clarification":True,"question_to_answer":"Ask one short clarification about what they want shared.","confidence":.5})
+
+
 def information_quality_failures(text:str,context:ConversationContext) -> list[str]:
     if context.intent!="PRODUCT_INFORMATION":return []
     failures=[];lower=text.lower()
@@ -46,6 +91,8 @@ def information_quality_failures(text:str,context:ConversationContext) -> list[s
     if not text.strip():failures.append("empty_answer")
     if context.active_topic=="BLISSIREE_OVERVIEW" and "blissiree" not in lower:failures.append("missing_platform_answer")
     if context.active_topic=="BLISSIREE_PROGRAMS" and not any(x in lower for x in ("emotional empowerment","unstoppable you","boost library")):failures.append("missing_program_answer")
+    if "LOW_CONFIDENCE" in context.current_explicit_themes and context.active_topic=="BLISSIREE_OVERVIEW" and "confidence" not in lower:
+        failures.append("missing_relevant_confidence_context")
     return failures
 
 

@@ -10,7 +10,7 @@ from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
 from blissiree.conversation_intent import ConversationIntent,classify_conversation_intent,contextual_fallback,conversation_stage
 from blissiree.product_info import is_product_information_request,product_information_response
 from blissiree.intent_router import BOOKING_URL,consultation_booking_response,route_top_level_intent
-from blissiree.conversation_state import conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,response_progress_failures,support_progress_stage
+from blissiree.conversation_state import apply_latest_message_authority,conversation_brief,fallback_context,information_quality_failures,progress_fallback,reconcile_context,resolve_conversation_reference,response_progress_failures,support_progress_stage
 from blissiree.schemas import ConversationContext
 from blissiree.persona import persona_quality_failures,persona_requirements
 
@@ -252,6 +252,30 @@ class ConversationProgressTests(unittest.TestCase):
         self.assertNotIn("white",text.lower());self.assertIn("accident",text.lower())
 
 class ContextEngineTests(unittest.TestCase):
+    def test_latest_low_confidence_is_not_sadness(self):
+        initial=ConversationContext(reported_emotions=["sadness"],current_inferred_themes=["SADNESS"])
+        result=apply_latest_message_authority(initial,"I feel low in confidenc3",[])
+        self.assertEqual(result.current_explicit_themes,["LOW_CONFIDENCE"])
+        self.assertEqual(result.reported_emotions,[])
+        self.assertNotIn("sadness",result.question_to_answer.lower())
+    def test_explicit_sadness_is_preserved(self):
+        result=apply_latest_message_authority(ConversationContext(),"I feel sad today",[])
+        self.assertEqual(result.current_explicit_themes,["SADNESS"])
+        self.assertEqual(result.reported_emotions,["sadness"])
+    def test_confidence_correction_requires_explicit_repair(self):
+        result=apply_latest_message_authority(ConversationContext(),"No, I said confidence",[])
+        self.assertEqual(result.intent,"FEEDBACK")
+        self.assertIn("confidence, not sadness",result.question_to_answer)
+    def test_short_followup_resolves_pending_work_stress_offer(self):
+        history=[{"role":"assistant","content":"Blissiree may have an audio collection for work stress. Would you like me to share it?"}]
+        result=resolve_conversation_reference(ConversationContext(intent="OUT_OF_SCOPE"),"please share",history)
+        self.assertEqual(result.intent,"RESOURCE_GUIDANCE")
+        self.assertEqual(result.resolved_reference,"work stress content")
+        self.assertFalse(result.needs_clarification)
+    def test_short_followup_without_context_clarifies(self):
+        result=resolve_conversation_reference(ConversationContext(intent="OUT_OF_SCOPE"),"please share",[])
+        self.assertEqual(result.intent,"RESOURCE_GUIDANCE")
+        self.assertTrue(result.needs_clarification)
     def test_natural_platform_language_routes_to_overview(self):
         context=fallback_context("I am interested in knowing about platform",[])
         self.assertEqual(context.intent,"PRODUCT_INFORMATION");self.assertEqual(context.active_topic,"BLISSIREE_OVERVIEW")

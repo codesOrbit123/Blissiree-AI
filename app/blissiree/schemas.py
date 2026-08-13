@@ -34,6 +34,10 @@ class ConversationContext(BaseModel):
     already_answered: list[str] = []
     conversation_stage: Literal["INFORMATION","DISCOVERY","EXPLORATION","SUPPORT_ACTION","RECOMMENDATION"] = "DISCOVERY"
     confidence: float = Field(default=0.0,ge=0,le=1)
+    current_explicit_themes: list[str] = []
+    current_inferred_themes: list[str] = []
+    resolved_reference: str | None = None
+    pending_offer_type: str | None = None
 
 class Recommendation(BaseModel):
     id: str

@@ -71,4 +71,9 @@ def contextual_product_fallback(context:ConversationContext,message:str,history:
         return ("Blissiree offers the Emotional Empowerment Program for longer-standing emotional patterns and responses, and the Unstoppable You Program "
                 "for adult confidence, focus, resilience, direction and personal growth. The app also includes the Boost Library and 30-minute Brain Reset "
                 "for optional wellbeing support. Which program would you like explained?")
+    if "LOW_CONFIDENCE" in context.current_explicit_themes:
+        return ("Blissiree is a wellbeing and personal-development platform with Emma and Ben companions, a Boost Library, structured Programs, "
+                "and optional consultations with Terri. Since you mentioned low confidence, its confidence-focused audio support and the Unstoppable You Program "
+                "may be relevant—but we can first talk through what has been affecting your confidence, without rushing you into a recommendation. "
+                "It is not a medical or healthcare service.")
     return product_information_response("What is Blissiree?",history)

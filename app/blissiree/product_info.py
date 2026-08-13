@@ -16,7 +16,10 @@ def is_product_information_request(message,history):
 def product_information_response(message,history):
     context=(" ".join(str(x.get("content","")) for x in history[-6:] if x.get("role")=="user")+" "+message).lower()
     if "consult" in context:
-        return "Blissiree also offers consultations with Terri. The official site describes a free 25-minute discovery call, an introductory session, and a personalised 14-session journey. Current availability and booking details are on blissiree.com/consultations."
+        return ("Blissiree offers consultations with Terri: a Free Consultation (25-minute discovery call), "
+                "an Introductory Session currently shown as $79 (usually $250), and a Personalised Program "
+                "described as a 14-session journey. If you want to book, tell me which option interests you and "
+                "I’ll give you the official calendar and payment link.")
     if "boost" in context or "audio" in context or "brain reset" in context:
         return "The Blissiree app includes a 30-minute Brain Reset and a Boost Library with more than 200 sleep-based audios and curated playlists for areas such as stress, anxious thinking, sleep and emotional balance. These are wellbeing and personal-development resources, not medical treatment."
     return ("Blissiree currently offers three main in-app pathways:\n\n"

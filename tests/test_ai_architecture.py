@@ -9,6 +9,7 @@ from blissiree.recommendations import SupportHorizonClassifier,ImmediateSupportE
 from blissiree.knowledge import KnowledgeRepository,rank_training_knowledge
 from blissiree.conversation_intent import ConversationIntent,classify_conversation_intent,contextual_fallback,conversation_stage
 from blissiree.product_info import is_product_information_request,product_information_response
+from blissiree.intent_router import BOOKING_URL,consultation_booking_response,route_top_level_intent
 
 class TriageTests(unittest.TestCase):
     def setUp(self): self.engine=TriageEngine()
@@ -195,6 +196,27 @@ class ProductInformationTests(unittest.TestCase):
     def test_official_site_knowledge_is_loaded(self):
         repo=KnowledgeRepository(Path(__file__).parents[1]/"knowledge")
         self.assertTrue(any(d["source"]=="BLISSIREE_OFFICIAL_WEBSITE" for d in repo.documents))
+
+class ConsultationBookingTests(unittest.TestCase):
+    def test_direct_free_consultation_booking_is_routed(self):
+        intent=route_top_level_intent("I want to book a free consultation with Terri",[])
+        self.assertEqual(intent.kind,"CONSULTATION_BOOKING")
+        self.assertEqual(intent.service,"FREE_CONSULTATION")
+
+    def test_introductory_session_is_identified(self):
+        intent=route_top_level_intent("Can I schedule the $79 introductory session?",[])
+        self.assertEqual(intent.service,"INTRODUCTORY_SESSION")
+
+    def test_general_companion_message_is_not_booking(self):
+        self.assertEqual(route_top_level_intent("I want to talk about a difficult day",[]).kind,"COMPANION_OR_INFORMATION")
+
+    def test_information_question_is_not_forced_into_booking(self):
+        self.assertEqual(route_top_level_intent("What consultations does Blissiree offer?",[]).kind,"COMPANION_OR_INFORMATION")
+
+    def test_booking_response_uses_only_official_portal(self):
+        response=consultation_booking_response("PERSONALISED_PROGRAM")
+        self.assertIn("14-session",response)
+        self.assertIn(BOOKING_URL,response)
 
 
 class TrainingKnowledgeTests(unittest.TestCase):

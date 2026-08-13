@@ -145,6 +145,13 @@ def report_conversation_issue(payload:IssuePayload):
 @app.get("/api/conversation-issues")
 def conversation_issues():return {"items":issue_store.list()}
 
+@app.post("/api/conversation-issues/{issue_id}/status")
+def conversation_issue_status(issue_id:str,body:dict):
+    status=str(body.get("status","")).upper()
+    if status not in {"OPEN","REVIEWED","RESOLVED"}:raise HTTPException(400,"Status must be OPEN, REVIEWED or RESOLVED")
+    try:return issue_store.update_status(issue_id,status,admin())
+    except KeyError:raise HTTPException(404,"Conversation issue not found")
+
 @app.post("/api/training/build")
 def build_training():
     return training_store.build(admin())

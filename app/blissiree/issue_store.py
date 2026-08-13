@@ -13,6 +13,13 @@ class ConversationIssueStore:
         if self.client:self.client.bucket(BUCKET).blob(OBJECT).upload_from_string(json.dumps(self._rows,separators=(",",":")),content_type="application/json")
     def create(self,persona,conversation_id,thread,description,actor):
         with self.lock:
-            row={"id":str(uuid.uuid4()),"status":"OPEN","created_at":datetime.now(timezone.utc).isoformat(),"reported_by":actor,"persona":persona,"conversation_id":conversation_id,"description":description.strip(),"thread":thread}
+            row={"id":str(uuid.uuid4()),"status":"OPEN","created_at":datetime.now(timezone.utc).isoformat(),"updated_at":datetime.now(timezone.utc).isoformat(),"reported_by":actor,"persona":persona,"conversation_id":conversation_id,"description":description.strip(),"thread":thread}
             self.load().append(row);self.save();return row
     def list(self):return list(reversed(self.load()))
+    def update_status(self,issue_id,status,actor):
+        with self.lock:
+            for row in self.load():
+                if row.get("id")==issue_id:
+                    row["status"]=status;row["updated_at"]=datetime.now(timezone.utc).isoformat();row["updated_by"]=actor
+                    self.save();return row
+        raise KeyError(issue_id)

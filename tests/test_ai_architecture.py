@@ -238,6 +238,10 @@ class ConversationProgressTests(unittest.TestCase):
         history=[{"role":"user","content":"my cat died in a car accident"}]
         text=progress_fallback("emma","I want some peace of mind",history)
         self.assertIn("little calm",text);self.assertNotIn("what you need most",text)
+    def test_accident_disclosure_fallback_uses_thread_facts(self):
+        history=[{"role":"user","content":"my cat died one year ago in a car accident"}]
+        text=progress_fallback("emma","the car fell from a cliff and she died",history)
+        self.assertIn("accident",text.lower());self.assertNotIn("what part of this feels most important",text.lower())
     def test_persona_fallbacks_are_distinct_and_contextual(self):
         emma=progress_fallback("emma","I am stuck in thoughts of her",self.history)
         ben=progress_fallback("ben","I am stuck in thoughts of her",self.history)

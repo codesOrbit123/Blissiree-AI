@@ -152,10 +152,10 @@ class BlissireeOrchestrator:
                     remaining=response_progress_failures(text,history,stage)+persona_quality_failures(text,persona,history,message,"SUPPORT")
                     if remaining or not valid:text=progress_fallback(persona,message,history) if stage=="SUPPORT_ACTION" else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
                     validation="pass:regenerated" if not remaining and valid else "fallback:"+",".join(remaining or failures)
-                elif not valid:text=contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
+                elif not valid:text=progress_fallback(persona,message,history) if conversation_intent.mode=="SUPPORT" and history else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
             except Exception as exc:
                 errors.append(f"generation:{type(exc).__name__}")
-                text=progress_fallback(persona,message,history) if stage=="SUPPORT_ACTION" else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
+                text=progress_fallback(persona,message,history) if conversation_intent.mode=="SUPPORT" and history else contract_fallback(persona,message,immediate,clarification,program_assessment,conversation_intent,bool(recent_user))
         generation_ms=round((time.perf_counter()-t)*1000)
         event={"request_id":request_id,"conversation_id":conversation_id,"persona":persona,"analysis_model":self.config.analysis_model,
             "conversation_model":self.config.conversation_model,"triage_level":triage.level,"retrieved_content_ids":[d["id"] for d in docs],

@@ -20,6 +20,11 @@ class AdminAICoach:
                 for _,_,r in scored[:limit]]
 
     def respond(self,message:str,history:list[dict],issue_id:str|None=None) -> CoachResponse:
+        combined="\n".join([str(x.get("content","")) for x in history[-10:] if x.get("role")=="user"]+[message])
+        problem=bool(re.search(r"\b(issue|problem|wrong|fix|repeated|repeating|context|reply|response|conversation|emma|ben)\b",message,re.I))
+        pasted=(bool(re.search(r"(?im)^\s*(user|emma|ben|assistant)\s*:",combined)) and len(combined.splitlines())>=3) or bool(issue_id)
+        if problem and not pasted:
+            return CoachResponse(message="Please copy and paste the complete conversation where you saw the issue, including the user’s messages and every Emma or Ben reply. Then add a short note explaining what felt wrong and how you would prefer the AI to respond.")
         issue=self._issue(issue_id)
         issue_text=" ".join(str(x.get("content","")) for x in (issue or {}).get("thread",[]))
         query=" ".join((message,issue_text,(issue or {}).get("description","")))

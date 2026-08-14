@@ -62,7 +62,7 @@ class ChatRequest(BaseModel):
     conversation_id:str|None=None
 
 class TrainingPayload(BaseModel):
-    id:str|None=None;title:str;instruction:str;target:str="ALL";category:str="OTHER";priority:str="NORMAL";status:str="DRAFT";source:str="TERRI";kind:str="INSTRUCTION";affected_components:list[str]=[];related_tests:list[str]=[];why_it_exists:str=""
+    id:str|None=None;title:str;instruction:str;target:str="ALL";category:str="OTHER";priority:str="NORMAL";status:str="DRAFT";source:str="TERRI";kind:str="INSTRUCTION";affected_components:list[str]=[];related_tests:list[str]=[];why_it_exists:str="";corrected_message_examples:list[dict]=[];conversation_examples:list[str]=[]
 
 class IssuePayload(BaseModel):
     persona:str;conversation_id:str;description:str=Field(min_length=3,max_length=2000);thread:list[dict]=Field(min_length=1,max_length=200)
@@ -166,6 +166,8 @@ def admin_coach_chat(body:CoachRequest):
 
 @app.post("/api/admin-coach/apply")
 def admin_coach_apply(payload:TrainingPayload):
+    if not payload.corrected_message_examples or len(payload.conversation_examples)<2:
+        raise HTTPException(400,"Review examples are required before an Admin AI Coach fix can be applied")
     actor=admin();data=payload.model_dump(exclude_none=True);data.update({"status":"ACTIVE","source":"TERRI_AI_COACH","kind":"INSTRUCTION"})
     conflicts=training_store.conflicts(payload.instruction,payload.id)
     if conflicts:raise HTTPException(409,{"message":"Conflict detected","conflicts":conflicts})

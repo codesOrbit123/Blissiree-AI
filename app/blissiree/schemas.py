@@ -81,6 +81,8 @@ class CoachProposal(BaseModel):
     priority: Literal["CRITICAL","HIGH","NORMAL","PREFERENCE"] = "HIGH"
     why_it_exists: str
     regression_tests: list[str] = []
+    corrected_message_examples: list[dict] = []
+    conversation_examples: list[str] = []
 
 class CoachResponse(BaseModel):
     message: str

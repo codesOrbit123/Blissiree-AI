@@ -57,6 +57,11 @@ class KnowledgeRepository:
             for offering in data["offerings"]:
                 self.documents.append({"id":"official-site:"+offering["name"].lower().replace(" ","-"),"source":"BLISSIREE_OFFICIAL_WEBSITE",
                                        "authority":95,"text":offering["name"]+": "+offering["details"]+" Source: "+offering["source_url"]})
+        summaries=root / "sources" / "large_source_summaries.json"
+        if summaries.exists():
+            for row in json.loads(summaries.read_text()).get("summaries",[]):
+                self.documents.append({"id":row["id"],"source":row["source"],"authority":row["authority"],"text":row["title"]+": "+row["text"],
+                                       "source_ids":row.get("source_ids",[]),"summary":True})
 
     def retrieve(self, query: str, limit: int = 10) -> list[dict]:
         terms = set(re.findall(r"[a-z]{4,}", query.lower()))
@@ -67,6 +72,12 @@ class KnowledgeRepository:
                 scored.append((overlap*10+doc["authority"]/100,doc))
         scored.sort(key=lambda x:(x[0],x[1]["authority"]),reverse=True)
         return [doc for _,doc in scored[:limit]]
+
+    def retrieve_broad(self,query:str,limit:int=24) -> list[dict]:
+        """Admin retrieval favours broad summaries while retaining exact source records."""
+        docs=self.retrieve(query,limit*2);summaries=[x for x in docs if x.get("summary")]
+        exact=[x for x in docs if not x.get("summary")]
+        return (summaries[:12]+exact[:12])[:limit]
 
     def approved_boosts(self) -> list[dict]:
         return [b for b in self.catalog["boosts"] if b.get("approved_for_ai_recommendation")]

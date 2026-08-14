@@ -3,7 +3,7 @@ import json
 from google import genai
 from google.genai import types
 from .config import AIConfig
-from .schemas import ConversationContext,MentalStateAnalysis,ResponseContract
+from .schemas import CoachResponse,ConversationContext,MentalStateAnalysis,ResponseContract
 
 class AnalysisLLMProvider(ABC):
     @abstractmethod
@@ -128,6 +128,21 @@ personal-development support, not medical care. Keep the response natural, conci
                                                thinking_config=types.ThinkingConfig(thinking_budget=0)))
         usage=response.usage_metadata.model_dump() if response.usage_metadata else {}
         return (response.text or draft).strip(),usage
+
+    def coach(self,payload:dict) -> tuple[CoachResponse,dict]:
+        system="""You are the private Blissiree Admin AI Coach for Terri. You are not Emma or Ben and you are not customer-facing.
+You may discuss any subject needed to diagnose conversation, product, prompt, knowledge, routing, UI or business issues. Use the supplied complete
+issue thread, relevant prompt records, selective large-source summaries and recent admin conversation. Be direct, collaborative and technically clear.
+Never pretend a change has been applied. First understand the problem and ask one focused clarification when Terri's desired behaviour is unclear.
+When the desired correction is clear or Terri asks you to propose/fix it, return a reusable proposal. A proposal must generalise the behaviour rather
+than overfit exact words; preserve medical boundaries, deterministic safety, exact catalogue titles and booking facts; identify Emma, Ben or ALL;
+and include regression tests. Do not place protected safety or medical-boundary changes in a proposal unless Terri explicitly asks to change them.
+Return the structured schema only. The message should explain your analysis and, when present, summarise what the proposal will change."""
+        response=self.client.models.generate_content(model=self.config.conversation_model,contents=json.dumps(payload,ensure_ascii=False),
+            config=types.GenerateContentConfig(system_instruction=system,response_mime_type="application/json",response_schema=CoachResponse,
+                temperature=.25,max_output_tokens=1800,thinking_config=types.ThinkingConfig(thinking_budget=0)))
+        usage=response.usage_metadata.model_dump() if response.usage_metadata else {}
+        return CoachResponse.model_validate_json(response.text),usage
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         result = self.client.models.embed_content(model=self.config.embedding_model, contents=texts)

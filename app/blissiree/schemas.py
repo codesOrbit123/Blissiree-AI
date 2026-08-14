@@ -72,3 +72,16 @@ class ResponseContract(BaseModel):
     conversation_brief: str | None = None
     persona_requirements: list[str] = []
     question_to_answer: str | None = None
+
+class CoachProposal(BaseModel):
+    title: str
+    instruction: str
+    target: Literal["ALL","EMMA","BEN"] = "ALL"
+    category: str = "CONVERSATION"
+    priority: Literal["CRITICAL","HIGH","NORMAL","PREFERENCE"] = "HIGH"
+    why_it_exists: str
+    regression_tests: list[str] = []
+
+class CoachResponse(BaseModel):
+    message: str
+    proposal: CoachProposal | None = None

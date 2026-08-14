@@ -16,6 +16,7 @@ from blissiree.orchestrator import BlissireeOrchestrator
 from blissiree.providers import GeminiProvider
 from blissiree.training_store import TrainingStore
 from blissiree.issue_store import ConversationIssueStore
+from blissiree.admin_coach import AdminAICoach
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL","INFO"),format="%(message)s")
 ROOT=Path(__file__).parent
@@ -24,6 +25,7 @@ repository=KnowledgeRepository(ROOT/"knowledge")
 training_store=TrainingStore(repository)
 issue_store=ConversationIssueStore()
 orchestrator=BlissireeOrchestrator(settings,provider,repository,training_store)
+admin_coach=AdminAICoach(provider,repository,training_store,issue_store)
 app=FastAPI()
 app.mount("/assets",StaticFiles(directory=ROOT/"assets"),name="assets")
 
@@ -64,6 +66,11 @@ class TrainingPayload(BaseModel):
 
 class IssuePayload(BaseModel):
     persona:str;conversation_id:str;description:str=Field(min_length=3,max_length=2000);thread:list[dict]=Field(min_length=1,max_length=200)
+
+class CoachRequest(BaseModel):
+    message:str=Field(min_length=1,max_length=8000)
+    history:list[dict]=Field(default=[],max_length=40)
+    issue_id:str|None=None
 
 def admin():
     return "Terri/Admin"
@@ -151,6 +158,19 @@ def conversation_issue_status(issue_id:str,body:dict):
     if status not in {"OPEN","REVIEWED","RESOLVED"}:raise HTTPException(400,"Status must be OPEN, REVIEWED or RESOLVED")
     try:return issue_store.update_status(issue_id,status,admin())
     except KeyError:raise HTTPException(404,"Conversation issue not found")
+
+@app.post("/api/admin-coach/chat")
+def admin_coach_chat(body:CoachRequest):
+    result=admin_coach.respond(body.message,body.history,body.issue_id)
+    return result.model_dump()
+
+@app.post("/api/admin-coach/apply")
+def admin_coach_apply(payload:TrainingPayload):
+    actor=admin();data=payload.model_dump(exclude_none=True);data.update({"status":"ACTIVE","source":"TERRI_AI_COACH","kind":"INSTRUCTION"})
+    conflicts=training_store.conflicts(payload.instruction,payload.id)
+    if conflicts:raise HTTPException(409,{"message":"Conflict detected","conflicts":conflicts})
+    saved=training_store.upsert(data,actor)
+    return {"applied":True,"item":saved,"message":"The approved instruction is active in the Training Library."}
 
 @app.post("/api/training/build")
 def build_training():

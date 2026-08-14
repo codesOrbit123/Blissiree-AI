@@ -5,6 +5,7 @@ import hashlib
 import time
 import logging
 import os
+import zipfile
 from pathlib import Path
 from fastapi import FastAPI,HTTPException,Request
 from fastapi.responses import FileResponse, StreamingResponse,JSONResponse
@@ -16,7 +17,7 @@ from blissiree.orchestrator import BlissireeOrchestrator
 from blissiree.providers import GeminiProvider
 from blissiree.training_store import TrainingStore
 from blissiree.issue_store import ConversationIssueStore
-from blissiree.admin_coach import AdminAICoach
+from blissiree.admin_coach import AdminAICoach,AdminCoachThreadStore
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL","INFO"),format="%(message)s")
 ROOT=Path(__file__).parent
@@ -26,6 +27,7 @@ training_store=TrainingStore(repository)
 issue_store=ConversationIssueStore()
 orchestrator=BlissireeOrchestrator(settings,provider,repository,training_store)
 admin_coach=AdminAICoach(provider,repository,training_store,issue_store)
+admin_coach_threads=AdminCoachThreadStore()
 app=FastAPI()
 app.mount("/assets",StaticFiles(directory=ROOT/"assets"),name="assets")
 
@@ -71,6 +73,7 @@ class CoachRequest(BaseModel):
     message:str=Field(min_length=1,max_length=8000)
     history:list[dict]=Field(default=[],max_length=40)
     issue_id:str|None=None
+    attachments:list[dict]=Field(default=[],max_length=5)
 
 def admin():
     return "Terri/Admin"
@@ -161,8 +164,17 @@ def conversation_issue_status(issue_id:str,body:dict):
 
 @app.post("/api/admin-coach/chat")
 def admin_coach_chat(body:CoachRequest):
-    result=admin_coach.respond(body.message,body.history,body.issue_id)
+    history=admin_coach_threads.load()
+    try:result=admin_coach.respond(body.message,history,body.issue_id,body.attachments)
+    except (ValueError,zipfile.BadZipFile) as exc:raise HTTPException(400,str(exc))
+    admin_coach_threads.append_exchange(body.message,result,body.attachments)
     return result.model_dump()
+
+@app.get("/api/admin-coach/thread")
+def admin_coach_thread():return {"messages":admin_coach_threads.load()}
+
+@app.post("/api/admin-coach/thread/clear")
+def admin_coach_thread_clear():admin_coach_threads.clear();return {"cleared":True}
 
 @app.post("/api/admin-coach/apply")
 def admin_coach_apply(payload:TrainingPayload):

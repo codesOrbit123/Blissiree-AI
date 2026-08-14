@@ -1,4 +1,5 @@
 import json
+import base64
 import sys
 import unittest
 from pathlib import Path
@@ -6,13 +7,13 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/"app"))
 
-from blissiree.admin_coach import AdminAICoach
+from blissiree.admin_coach import AdminAICoach,AdminCoachThreadStore,decode_attachments
 from blissiree.knowledge import KnowledgeRepository
 from blissiree.schemas import CoachProposal,CoachResponse
 
 class FakeProvider:
     def __init__(self):self.payload=None
-    def coach(self,payload):
+    def coach(self,payload,media=None):
         self.payload=payload
         return CoachResponse(message="I found the context.",proposal=CoachProposal(title="Natural acceptance",instruction="Acknowledge accepted recommendations without restarting discovery.",target="ALL",category="CONVERSATION",why_it_exists="Preserves continuity.",regression_tests=["checking it ends without a question"],corrected_message_examples=[{"user_message":"checking it","emma_response":"Take your time.","ben_response":"Good—see how it fits.","explanation":"Acknowledges the action."}],conversation_examples=["User: checking it\nEmma: Take your time.","User: listening now\nBen: Good—see how it fits."])),{}
 
@@ -23,6 +24,19 @@ class FakeIssues:
     def load(self):return [{"id":"i1","description":"Reply restarted discovery","thread":[{"role":"user","content":"checking it"}]}]
 
 class AdminCoachTests(unittest.TestCase):
+    def test_text_attachment_is_safely_extracted(self):
+        textual,media=decode_attachments([{"name":"notes.txt","mime_type":"text/plain","data_base64":base64.b64encode(b"User: hello\nEmma: hi").decode()}])
+        self.assertIn("Emma: hi",textual[0]["text"]);self.assertEqual(media,[])
+
+    def test_image_attachment_is_prepared_for_multimodal_gemini(self):
+        textual,media=decode_attachments([{"name":"screen.png","mime_type":"image/png","data_base64":base64.b64encode(b"fake-png").decode()}])
+        self.assertEqual(textual,[]);self.assertEqual(media[0]["mime_type"],"image/png")
+
+    def test_coach_thread_is_preserved_in_store(self):
+        store=AdminCoachThreadStore();store.client=None;store._messages=[]
+        result=CoachResponse(message="Please paste the thread.")
+        store.append_exchange("There is an issue",result,[])
+        self.assertEqual([x["role"] for x in store.load()],["user","assistant"])
     def test_selective_summaries_are_loaded_alongside_exact_records(self):
         repo=KnowledgeRepository(ROOT/"knowledge")
         self.assertTrue(any(x.get("summary") for x in repo.documents))

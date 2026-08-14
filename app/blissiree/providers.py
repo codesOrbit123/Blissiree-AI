@@ -129,7 +129,7 @@ personal-development support, not medical care. Keep the response natural, conci
         usage=response.usage_metadata.model_dump() if response.usage_metadata else {}
         return (response.text or draft).strip(),usage
 
-    def coach(self,payload:dict) -> tuple[CoachResponse,dict]:
+    def coach(self,payload:dict,media:list[dict]|None=None) -> tuple[CoachResponse,dict]:
         system="""You are the private Blissiree Admin AI Coach for Terri. You are not Emma or Ben and you are not customer-facing.
 You may discuss any subject needed to diagnose conversation, product, prompt, knowledge, routing, UI or business issues. Use the supplied complete
 issue thread, relevant prompt records, selective large-source summaries and recent admin conversation. Be direct, collaborative and technically clear.
@@ -144,7 +144,8 @@ Every proposal must include corrected_message_examples showing the triggering us
 It must also include at least two conversation_examples as short multi-turn transcripts demonstrating how the proposed update will behave in realistic
 variations. Make persona differences visible when target is ALL. These previews are mandatory because Terri must see expected behaviour before approval.
 Return the structured schema only. The message should explain your analysis and, when present, summarise what the proposal will change."""
-        response=self.client.models.generate_content(model=self.config.conversation_model,contents=json.dumps(payload,ensure_ascii=False),
+        contents=[json.dumps(payload,ensure_ascii=False)]+[types.Part.from_bytes(data=x["data"],mime_type=x["mime_type"]) for x in (media or [])]
+        response=self.client.models.generate_content(model=self.config.conversation_model,contents=contents,
             config=types.GenerateContentConfig(system_instruction=system,response_mime_type="application/json",response_schema=CoachResponse,
                 temperature=.25,max_output_tokens=1800,thinking_config=types.ThinkingConfig(thinking_budget=0)))
         usage=response.usage_metadata.model_dump() if response.usage_metadata else {}

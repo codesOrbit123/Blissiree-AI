@@ -73,6 +73,12 @@ class ResponseContract(BaseModel):
     persona_requirements: list[str] = []
     question_to_answer: str | None = None
 
+class CoachCorrectedExample(BaseModel):
+    user_message: str
+    emma_response: str | None = None
+    ben_response: str | None = None
+    explanation: str
+
 class CoachProposal(BaseModel):
     title: str
     instruction: str
@@ -81,7 +87,7 @@ class CoachProposal(BaseModel):
     priority: Literal["CRITICAL","HIGH","NORMAL","PREFERENCE"] = "HIGH"
     why_it_exists: str
     regression_tests: list[str] = []
-    corrected_message_examples: list[dict] = []
+    corrected_message_examples: list[CoachCorrectedExample] = []
     conversation_examples: list[str] = []
 
 class CoachResponse(BaseModel):

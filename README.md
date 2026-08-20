@@ -39,3 +39,15 @@ Deploy only after tests and direct API validation pass. Preserve the preceding h
 - Preserve authentication, output validation, multi-turn safety handling, and the internal-contract leakage regression test.
 
 See [AGENTS.md](AGENTS.md) for the required development and deployment workflow.
+
+## Mobile AI integration (initial API)
+
+The initial app integration keeps the API deliberately small:
+
+- `POST /api/v1/users/sync` creates or retrieves the AI user and its separate Emma and Ben threads.
+- `WSS /api/v1/chat` accepts a `start` event containing `external_user_id`, `persona`, and the temporary app integration key, followed by `message` events.
+- `DELETE /api/v1/users/{external_user_id}` deletes the profile, both persona threads, messages, and summaries.
+
+HTTP calls use `X-Blissiree-App-Key`. The key is supplied through the `MOBILE_API_KEY` Secret Manager environment reference and must never be committed or logged. This is a temporary integration boundary until the existing mobile login token is verified directly by the AI service.
+
+For every socket message the server supplies Gemini with the selected persona's durable long-term summary and latest ten complete user/assistant exchanges. The final validated exchange is persisted. Summary refresh runs after the reply and is due weekly, or earlier when eight unsummarised exchanges accumulate, so it does not delay the visible response.

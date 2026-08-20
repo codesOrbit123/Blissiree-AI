@@ -44,7 +44,7 @@ Return separate boost and program relevance. JSON input:\n""" + str(payload)
         return MentalStateAnalysis.model_validate_json(response.text)
 
     def contextualize(self,message:str,history:list[dict]) -> ConversationContext:
-        prompt={"recent_history":history[-12:],"latest_user_message":message}
+        prompt={"recent_history":history[-21:],"latest_user_message":message}
         system="""Interpret the latest message in conversational context and return structured state only. Prefer the user's actual goal over literal keywords.
 Resolve short or elliptical follow-ups from prior turns. After discussing Blissiree programs, “emotional support” means the user wants the offering relevant
 to emotional support, not necessarily a new personal disclosure. PRODUCT_INFORMATION covers Blissiree, its platform, business, app, programs, Boosts and
@@ -102,7 +102,7 @@ present and gently relational; Ben must feel steady, structured and practical. T
 Do not begin with “It sounds like”, “you seem curious”, or an emotional reflection. Use recent context to resolve follow-ups. Do not turn a factual
 question into an interview. If useful, end with one concise choice; do not ask what the user wants to know when their question is already clear."""
         if correction:system += "\nThe previous draft failed quality validation. Correct these issues without mentioning validation: "+correction
-        prompt = {"response_contract": contract.model_dump(), "recent_history": history[-8:], "user_message": message}
+        prompt = {"response_contract": contract.model_dump(), "recent_history": history[-21:], "user_message": message}
         response = self.client.models.generate_content(
             model=self.config.conversation_model, contents=json.dumps(prompt,ensure_ascii=False),
             config=types.GenerateContentConfig(system_instruction=system, temperature=0.2, max_output_tokens=400,
@@ -154,3 +154,14 @@ Return the structured schema only. The message should explain your analysis and,
     def embed(self, texts: list[str]) -> list[list[float]]:
         result = self.client.models.embed_content(model=self.config.embedding_model, contents=texts)
         return [item.values for item in result.embeddings]
+
+    def summarize_thread(self, persona: str, existing_summary: str, exchanges: list[dict]) -> str:
+        system = """Maintain a concise factual memory for one user's Blissiree companion thread. Merge the existing summary with the new exchanges.
+Keep only user-stated preferences, goals, recurring themes, relevant Blissiree use, unresolved topics and useful communication preferences.
+Do not diagnose, infer medical facts, invent details, or treat assistant statements as user facts. Write neutral third-person notes, maximum 500 words.
+Return only the updated summary."""
+        payload={"persona":persona,"existing_summary":existing_summary,"new_exchanges":exchanges}
+        response=self.client.models.generate_content(model=self.config.analysis_model,contents=json.dumps(payload,ensure_ascii=False),
+            config=types.GenerateContentConfig(system_instruction=system,temperature=0,max_output_tokens=700,
+                                               thinking_config=types.ThinkingConfig(thinking_budget=0)))
+        return (response.text or existing_summary).strip()

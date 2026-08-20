@@ -6,8 +6,9 @@ import time
 import logging
 import os
 import zipfile
+import asyncio
 from pathlib import Path
-from fastapi import FastAPI,HTTPException,Request
+from fastapi import FastAPI,HTTPException,Request,WebSocket,WebSocketDisconnect
 from fastapi.responses import FileResponse, StreamingResponse,JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -18,6 +19,7 @@ from blissiree.providers import GeminiProvider
 from blissiree.training_store import TrainingStore
 from blissiree.issue_store import ConversationIssueStore
 from blissiree.admin_coach import AdminAICoach,AdminCoachThreadStore
+from blissiree.mobile_store import MobileConversationStore
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL","INFO"),format="%(message)s")
 ROOT=Path(__file__).parent
@@ -28,10 +30,11 @@ issue_store=ConversationIssueStore()
 orchestrator=BlissireeOrchestrator(settings,provider,repository,training_store)
 admin_coach=AdminAICoach(provider,repository,training_store,issue_store)
 admin_coach_threads=AdminCoachThreadStore()
+mobile_store=MobileConversationStore()
 app=FastAPI()
 app.mount("/assets",StaticFiles(directory=ROOT/"assets"),name="assets")
 
-PUBLIC_PATHS={"/login","/api/auth/login","/health","/sw.js"}
+PUBLIC_PATHS={"/login","/api/auth/login","/health","/sw.js","/api/v1/users/sync"}
 def session_token(username:str) -> str:
     payload=f"{username}:{int(time.time())+43200}"
     encoded=base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
@@ -51,7 +54,7 @@ def valid_session(token:str|None) -> bool:
 @app.middleware("http")
 async def protect_app(request:Request,call_next):
     path=request.url.path
-    if path in PUBLIC_PATHS or path.startswith("/assets/"):return await call_next(request)
+    if path in PUBLIC_PATHS or path.startswith("/assets/") or path.startswith("/api/v1/users/"):return await call_next(request)
     if not valid_session(request.cookies.get("blissiree_session")):
         if path.startswith("/api/"):return JSONResponse({"detail":"Please sign in"},status_code=401)
         return FileResponse(ROOT/"login.html",status_code=401)
@@ -74,6 +77,20 @@ class CoachRequest(BaseModel):
     history:list[dict]=Field(default=[],max_length=40)
     issue_id:str|None=None
     attachments:list[dict]=Field(default=[],max_length=5)
+
+class MobileUserSync(BaseModel):
+    external_user_id:str=Field(min_length=1,max_length=200)
+    display_name:str=Field(default="",max_length=120)
+    email:str|None=Field(default=None,max_length=320)
+    phone:str|None=Field(default=None,max_length=40)
+
+def valid_app_key(value:str|None) -> bool:
+    configured=os.getenv("MOBILE_API_KEY","")
+    return bool(configured and value and hmac.compare_digest(configured,value))
+
+def require_app_key(request:Request):
+    if not valid_app_key(request.headers.get("x-blissiree-app-key")):
+        raise HTTPException(401,"Invalid app credentials")
 
 def admin():
     return "Terri/Admin"
@@ -104,6 +121,64 @@ def meta():
     return {"analysis_model":settings.analysis_model,"conversation_model":settings.conversation_model,
             "boost_collections":len(orchestrator.repo.catalog["boost_collections"]),
             "boost_audios":len(orchestrator.repo.catalog["boosts"]),"programs":len(orchestrator.repo.catalog["programs"])}
+
+@app.post("/api/v1/users/sync")
+def mobile_user_sync(body:MobileUserSync,request:Request):
+    require_app_key(request)
+    record,created=mobile_store.sync(body.external_user_id,body.display_name,body.email,body.phone)
+    return {"user_id":record["id"],"created":created,"personas":["emma","ben"]}
+
+@app.delete("/api/v1/users/{external_user_id}")
+def mobile_user_delete(external_user_id:str,request:Request):
+    require_app_key(request)
+    deleted=mobile_store.delete(external_user_id)
+    if not deleted:raise HTTPException(404,"AI user not found")
+    return {"deleted":True}
+
+async def update_mobile_summary(external_user_id:str,persona:str):
+    if not mobile_store.summary_due(external_user_id,persona):return
+    try:
+        existing,exchanges,count=mobile_store.summary_input(external_user_id,persona)
+        summary=await asyncio.to_thread(provider.summarize_thread,persona,existing,exchanges)
+        await asyncio.to_thread(mobile_store.save_summary,external_user_id,persona,summary,count)
+    except Exception as exc:
+        logging.getLogger("blissiree.ai").warning("mobile_summary_update_failed:%s",type(exc).__name__)
+
+@app.websocket("/api/v1/chat")
+async def mobile_chat(websocket:WebSocket):
+    await websocket.accept()
+    external_user_id=None;persona=None
+    try:
+        start=await websocket.receive_json()
+        if start.get("type")!="start" or not valid_app_key(str(start.get("app_key",""))):
+            await websocket.send_json({"type":"error","code":"unauthorized"});await websocket.close(code=1008);return
+        external_user_id=str(start.get("external_user_id","")).strip()
+        persona=str(start.get("persona","emma")).lower()
+        if not external_user_id or persona not in {"emma","ben"}:
+            await websocket.send_json({"type":"error","code":"invalid_start"});await websocket.close(code=1008);return
+        try:record,summary,history=mobile_store.context(external_user_id,persona)
+        except KeyError:
+            await websocket.send_json({"type":"error","code":"user_not_registered"});await websocket.close(code=1008);return
+        await websocket.send_json({"type":"ready","user_id":record["id"],"thread_id":record["threads"][persona]["id"],"persona":persona})
+        while True:
+            event=await websocket.receive_json()
+            if event.get("type")!="message":continue
+            message=str(event.get("text","")).strip();client_id=str(event.get("client_message_id","")).strip()
+            if not message or len(message)>4000 or not client_id or len(client_id)>200:
+                await websocket.send_json({"type":"error","code":"invalid_message"});continue
+            _,summary,history=mobile_store.context(external_user_id,persona)
+            contextual_history=history+([{"role":"context","content":"Earlier thread summary: "+summary}] if summary else [])
+            await websocket.send_json({"type":"response_start","client_message_id":client_id})
+            result=await asyncio.to_thread(orchestrator.respond,message,persona,contextual_history,record["threads"][persona]["id"])
+            exchange=mobile_store.append(external_user_id,persona,message,result["message"],client_id)
+            await websocket.send_json({"type":"response_complete","message_id":exchange["id"],"client_message_id":client_id,
+                                       "text":result["message"],"persona":persona,"active_agent":result.get("active_agent")})
+            if mobile_store.summary_due(external_user_id,persona):
+                asyncio.create_task(update_mobile_summary(external_user_id,persona))
+    except WebSocketDisconnect:return
+    except (ValueError,TypeError,json.JSONDecodeError):
+        try:await websocket.send_json({"type":"error","code":"invalid_payload"});await websocket.close(code=1003)
+        except Exception:return
 
 @app.get("/api/training/library")
 def training_library(q:str="",category:str="ALL",target:str="ALL"):

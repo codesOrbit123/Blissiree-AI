@@ -8,8 +8,8 @@ def flag(name: str, default: bool = True) -> bool:
 class AIConfig:
     project: str = os.getenv("GOOGLE_CLOUD_PROJECT", "")
     region: str = os.getenv("GOOGLE_CLOUD_REGION", os.getenv("GOOGLE_CLOUD_LOCATION", "global"))
-    analysis_model: str = os.getenv("GEMINI_ANALYSIS_MODEL", "gemini-2.5-flash-lite")
-    conversation_model: str = os.getenv("GEMINI_CONVERSATION_MODEL", "gemini-2.5-flash")
+    analysis_model: str = os.getenv("GEMINI_ANALYSIS_MODEL", "gemini-3.6-flash")
+    conversation_model: str = os.getenv("GEMINI_CONVERSATION_MODEL", "gemini-3.6-flash")
     embedding_model: str = os.getenv("GEMINI_EMBEDDING_MODEL", "text-embedding-005")
     analysis_enabled: bool = flag("AI_ANALYSIS_ENABLED")
     rag_enabled: bool = flag("AI_RAG_ENABLED")

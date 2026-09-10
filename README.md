@@ -8,8 +8,8 @@ Production Blissiree 2.0 companion application using Google Gemini on Vertex AI.
 - Region: `asia-southeast1`
 - Cloud Run service: `blissiree-gemini-chat`
 - URL: <https://blissiree-gemini-chat-784677366855.asia-southeast1.run.app>
-- Gemini analysis model: `gemini-2.5-flash-lite`
-- Gemini conversation model: `gemini-2.5-flash`
+- Gemini analysis model: `gemini-3.6-flash`
+- Gemini conversation model: `gemini-3.6-flash`
 
 Application credentials and the session-signing key are stored in Google Secret Manager. Never add their values to this repository.
 

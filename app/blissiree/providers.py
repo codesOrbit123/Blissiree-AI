@@ -39,7 +39,7 @@ Return separate boost and program relevance. JSON input:\n""" + str(payload)
             config=types.GenerateContentConfig(
                 system_instruction="You perform structured wellbeing-language extraction. Observations are not diagnoses. Return the schema only.",
                 response_mime_type="application/json", response_schema=MentalStateAnalysis,
-                max_output_tokens=500,
+                max_output_tokens=500,automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                 thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)))
         return MentalStateAnalysis.model_validate_json(response.text)
 
@@ -55,7 +55,8 @@ Preserve raw_user_message exactly. interpreted_message may clarify wording but m
 Keep explicit themes separate from inferred themes and record genuine ambiguities. Do not diagnose."""
         response=self.client.models.generate_content(model=self.config.analysis_model,contents=json.dumps(prompt,ensure_ascii=False),
             config=types.GenerateContentConfig(system_instruction=system,response_mime_type="application/json",response_schema=ConversationContext,
-                max_output_tokens=700,thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)))
+                max_output_tokens=700,automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)))
         return ConversationContext.model_validate_json(response.text)
 
     def generate(self, contract: ResponseContract, message: str, history: list[dict],correction:str|None=None) -> tuple[str, dict]:
@@ -106,6 +107,7 @@ question into an interview. If useful, end with one concise choice; do not ask w
         response = self.client.models.generate_content(
             model=self.config.conversation_model, contents=json.dumps(prompt,ensure_ascii=False),
             config=types.GenerateContentConfig(system_instruction=system,max_output_tokens=400,
+                                               automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                                                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)))
         usage = response.usage_metadata.model_dump() if response.usage_metadata else {}
         return response.text or "", usage
@@ -125,6 +127,7 @@ personal-development support, not medical care. Keep the response natural, conci
         response=self.client.models.generate_content(
             model=self.config.conversation_model,contents=json.dumps(payload,ensure_ascii=False),
             config=types.GenerateContentConfig(system_instruction=system,max_output_tokens=400,
+                                               automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                                                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)))
         usage=response.usage_metadata.model_dump() if response.usage_metadata else {}
         return (response.text or draft).strip(),usage
@@ -147,7 +150,8 @@ Return the structured schema only. The message should explain your analysis and,
         contents=[json.dumps(payload,ensure_ascii=False)]+[types.Part.from_bytes(data=x["data"],mime_type=x["mime_type"]) for x in (media or [])]
         response=self.client.models.generate_content(model=self.config.conversation_model,contents=contents,
             config=types.GenerateContentConfig(system_instruction=system,response_mime_type="application/json",response_schema=CoachResponse,
-                max_output_tokens=1800,thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)))
+                max_output_tokens=1800,automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)))
         usage=response.usage_metadata.model_dump() if response.usage_metadata else {}
         return CoachResponse.model_validate_json(response.text),usage
 
@@ -163,5 +167,6 @@ Return only the updated summary."""
         payload={"persona":persona,"existing_summary":existing_summary,"new_exchanges":exchanges}
         response=self.client.models.generate_content(model=self.config.analysis_model,contents=json.dumps(payload,ensure_ascii=False),
             config=types.GenerateContentConfig(system_instruction=system,max_output_tokens=700,
+                                               automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
                                                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL)))
         return (response.text or existing_summary).strip()
